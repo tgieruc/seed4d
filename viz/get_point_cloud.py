@@ -17,7 +17,7 @@ def path_to_info(transforms_path, index):
 
 def img_to_pointcloud(img, depth, K, Rt, voxel_size=0.01):
     
-    img = (img*256).astype(np.int8)
+    img = (img*255).astype(np.uint8)
     rgb = o3d.geometry.Image(np.ascontiguousarray(img))
     depth = o3d.geometry.Image(np.ascontiguousarray(depth))
     rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb, depth, depth_scale=1.0, depth_trunc=50.0, convert_rgb_to_intensity=False)

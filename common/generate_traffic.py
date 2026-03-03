@@ -127,7 +127,7 @@ def spawn_pedestrians(client, world, number_of_walkers, blueprints_walkers, logg
     '''
     
     if number_of_walkers <= 0:
-        return
+        return [], []
 
     spawn_points = []
     for _ in range(number_of_walkers):

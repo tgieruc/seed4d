@@ -83,14 +83,9 @@ def main(args):
             stderr=subprocess.DEVNULL,
         )
 
-        while (process.status() != psutil.STATUS_DEAD) and (
-            process.status() != psutil.STATUS_ZOMBIE
-        ):
-            sleep(1)
-
-        if process.status() == psutil.STATUS_DEAD:
+        process.wait()
+        if process.returncode != 0:
             fails.append(config)
-        process.kill()
         
         # obtain file path
         with open(config, "r") as file:
@@ -156,11 +151,13 @@ def main(args):
         print(f"Failed to generate data for {len(fails)} configs")
 
         os.makedirs(os.path.join(args.data_dir, "failed_configs"), exist_ok=True)
-        for i, config in enumerate(fails):
+        for i, fail_path in enumerate(fails):
+            with open(fail_path, "r") as src:
+                config_data = yaml.safe_load(src)
             with open(
                 os.path.join(args.data_dir, "failed_configs", f"config_{i}.yaml"), "w"
             ) as f:
-                yaml.dump(config, f)
+                yaml.dump(config_data, f)
 
 def str2bool(v):
     if isinstance(v, bool):

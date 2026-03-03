@@ -27,7 +27,7 @@ def get_single_point_cloud(
         o3d.geometry.PointCloud: Point cloud
     """
 
-    rotation = transform[:3, :3]
+    rotation = transform[:3, :3].copy()
     translation = transform[:3, 3] / 100.0
 
     transform[:3, :3] = rotation.T
@@ -38,7 +38,7 @@ def get_single_point_cloud(
 
     depth_raw = o3d.io.read_image(depth_map_path)
 
-    color_raw_cv = cv2.imread(rgb_image_path, cv2.COLOR_RGB2BGR)
+    color_raw_cv = cv2.imread(rgb_image_path)
     color_raw = o3d.geometry.Image(color_raw_cv)
 
     rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(

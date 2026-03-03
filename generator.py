@@ -121,8 +121,8 @@ class Generator:
                 "CARLA executable not found at {}".format(self.carla_executable)
             )
 
-        flag = "-carla-server -RenderOffScreen -nosound -quality-level=Epic "
-        command = [self.carla_executable, flag]
+        flags = ["-carla-server", "-RenderOffScreen", "-nosound", "-quality-level=Epic"]
+        command = [self.carla_executable] + flags
         # potentially add: stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.carla_process = subprocess.Popen(command)  
         # this timer might cause problems - if not starting up increase the value!
@@ -143,7 +143,8 @@ class Generator:
                 # logger.exception("Error occurred while connecting to the CARLA server")
                 sleep(1)
 
-        self._launch_carla()
+        self.logger.error("CARLA process exited unexpectedly. Could not connect.")
+        raise RuntimeError("CARLA process exited unexpectedly. Could not connect.")
 
     def kill_carla(self):
 
@@ -245,7 +246,7 @@ class Generator:
             self.config["spawn_point"], self.spawn_points
         ):
 
-            logger.info(
+            self.logger.info(
                 f" Starting data generation for spawn point {n_spawnpoint} of map {self.config['map']}."
             )
 
@@ -342,7 +343,7 @@ class Generator:
 
                 # Save sensor data
                 self.logger.info("saving data")
-                path = os.path.join(
+                ego_path = os.path.join(
                     self.data_dir,
                     self.config["map"],
                     self.config["weather"],
@@ -351,7 +352,7 @@ class Generator:
                     f"step_{step}",
                     "ego_vehicle",
                 )
-                ego_vehicle.save_data(path)
+                ego_vehicle.save_data(ego_path)
                 if self.config.get("other_vehicles_have_sensors", False):
                     for vehicle in traffic_vehicles:
                         path = os.path.join(
@@ -372,7 +373,7 @@ class Generator:
                         [vehicle.go_down() for vehicle in traffic_vehicles]
                     ego_vehicle.reset_invisible_sensors()
                     self._tick()
-                    ego_vehicle.save_invisible_data(path)
+                    ego_vehicle.save_invisible_data(ego_path)
                     ego_vehicle.go_up()
                     self._tick()
 
@@ -439,7 +440,9 @@ class Generator:
             try:
                 for actors in self.world.get_actors().filter("vehicle.*"):
                     vehicle_types[actors.id] = actors.type_id
-                    actors.destroy()
+                ego_vehicle.destroy()
+                for vehicle in traffic_vehicles:
+                    vehicle.destroy()
                 for actors in self.world.get_actors().filter("walker.*"):
                     actors.destroy()
             except:
@@ -556,7 +559,7 @@ class Generator:
                 transform_file_cams=sensor_config["transform_file_cams"],
                 transform_file_lidar=sensor_config.get("transform_file_lidar", None),
                 vehicle=vehicle if sensor_config["attached_to_vehicle"] else None,
-                logger=logger,
+                logger=self.logger,
             )
 
         return sensor_managers
@@ -590,7 +593,7 @@ class Generator:
                     transform_file_cams=cam2world,
                     transform_file_lidar=None,
                     vehicle=None,
-                    logger=logger,
+                    logger=self.logger,
                     temporary=True,
                 )
 
@@ -617,7 +620,7 @@ class Generator:
                         "transform_file_lidar", None
                     ),
                     vehicle=vehicle,
-                    logger=logger,
+                    logger=self.logger,
                 )
 
         return sensor_managers

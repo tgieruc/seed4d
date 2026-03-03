@@ -97,7 +97,7 @@ class Sensor:
     def save_sensor_data(self, path):
 
         if self.sensor_type == "sensor.camera.depth":
-            rgb = np.array(self.output.raw_data, dtype=np.float32).reshape(
+            rgb = np.frombuffer(self.output.raw_data, dtype=np.uint8).astype(np.float32).reshape(
                 (self.output.height, self.output.width, 4)
             )[:, :, :3]
             B = rgb[:, :, 0]
@@ -156,7 +156,7 @@ class Sensor:
     def get_nerf_transform(self):
         # carla_transform = self.sensor.get_transform()
         carla_transform = (np.array(self.vehicle.get_transform().get_matrix()) @ np.array(self.carla_transform.get_matrix()) )  
-        x,y,z,yaw, roll,pitch = pose.extract_xyz_yaw_pitch_roll(carla_transform)
+        x,y,z,yaw, pitch, roll = pose.extract_xyz_yaw_pitch_roll(carla_transform)
         carla_transform = carla.Transform(
             carla.Location(x=x, y=y, z=z), carla.Rotation(pitch=pitch, yaw=yaw, roll=roll)
         )
@@ -164,8 +164,14 @@ class Sensor:
         return nerf_transform
 
     def get_nerf_transform_ego(self):
-        vehicle_location = self.carla_transform
-        vehicle_location.location.z -= self.z_offset
+        vehicle_location = carla.Transform(
+            carla.Location(
+                x=self.carla_transform.location.x,
+                y=self.carla_transform.location.y,
+                z=self.carla_transform.location.z - self.z_offset,
+            ),
+            self.carla_transform.rotation,
+        )
         nerf_ego_transform = pose.carla_to_nerf_unnormalized(vehicle_location)
         # nerf_ego_transform = pose.carla_to_nerf_unnormalized(self.carla_transform)
         #nerf_ego_transform = np.array(nerf_ego_transform)
@@ -530,7 +536,7 @@ class SensorManager:
                 self._save_lidar_transforms(save_path, "lidar_transforms.json")
             self._save_metadata(save_path)
         else:
-            if save_path.split("/")[9] == "nuscenes":
+            if "/nuscenes/" in save_path or save_path.endswith("/nuscenes"):
                 self._save_sensor_data(os.path.join(save_path, "sensors"), setup_name)
             else:
                 self._save_sensor_data(
