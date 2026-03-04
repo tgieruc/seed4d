@@ -5,7 +5,7 @@ echo "Starting SEED4D Web UI..."
 # Start backend
 cd "$(dirname "$0")"
 echo "Starting backend on :8000..."
-(cd .. && python -m uvicorn webui.backend.main:app --reload --port 8000) &
+(cd .. && uv run --group webui uvicorn webui.backend.main:app --reload --port 8000) &
 BACKEND_PID=$!
 
 # Start frontend
