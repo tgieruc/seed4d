@@ -1,0 +1,18 @@
+[project]
+name = "seed4d"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "carla==0.9.16",
+    "jupyterlab",
+    "matplotlib",
+    "opencv-python",
+    "scikit-image",
+    "pandas",
+    "tqdm",
+    "pypng",
+    "open3d",
+    "tabulate",
+]
