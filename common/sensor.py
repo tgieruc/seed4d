@@ -7,11 +7,12 @@ import json
 import logging
 import math
 import os
+from concurrent.futures import ThreadPoolExecutor
 from time import sleep, time
 
 import carla
+import cv2
 import numpy as np
-import png
 from PIL import Image
 
 import common.pose as pose
@@ -104,29 +105,14 @@ class Sensor:
             np.clip(normalized, 0, 65535 / 1e6, out=normalized)
             depth_mm = np.array(normalized * 1e6, dtype=np.uint16)
 
-            with open(path, "wb") as f:
-                writer = png.Writer(
-                    width=depth_mm.shape[1],
-                    height=depth_mm.shape[0],
-                    bitdepth=16,
-                    greyscale=True,
-                )
-                zgray2list = depth_mm.tolist()
-                writer.write(f, zgray2list)
+            cv2.imwrite(path, depth_mm)
 
         elif self.sensor_type == "sensor.camera.semantic_segmentation":
             semantic_segmentation = np.array(self.output.raw_data, dtype=np.uint8).reshape(
                 (self.output.height, self.output.width, 4)
             )[:, :, 2]
 
-            with open(path, "wb") as f:
-                writer = png.Writer(
-                    width=semantic_segmentation.shape[1],
-                    height=semantic_segmentation.shape[0],
-                    bitdepth=8,
-                    greyscale=True,
-                )
-                writer.write(f, semantic_segmentation.tolist())
+            cv2.imwrite(path, semantic_segmentation)
 
         elif self.sensor_type == "sensor.camera.optical_flow":
             optical_flow = (
@@ -311,6 +297,7 @@ class SensorManager:
 
         if transform_file_cams:
             self._get_cam_properties()
+            self._precompute_intrinsics()
         self._get_sensors()
 
     def _get_cam_properties(self):
@@ -325,6 +312,18 @@ class SensorManager:
         if "height" not in self.spawn_transforms_cams:
             self.spawn_transforms_cams["height"] = [self.sensor_info["height"]] * len(
                 self.spawn_transforms_cams["coordinates"]
+            )
+
+    def _precompute_intrinsics(self):
+        """Pre-compute per-camera intrinsics to avoid recalculating each frame."""
+        self._cached_intrinsics = []
+        for i in range(len(self.spawn_transforms_cams["fov"])):
+            self._cached_intrinsics.append(
+                self.get_camera_intrinsics_from_fov(
+                    self.spawn_transforms_cams["fov"][i],
+                    self.spawn_transforms_cams["width"][i],
+                    self.spawn_transforms_cams["height"][i],
+                )
             )
 
     def _get_carla_transforms(self):
@@ -410,38 +409,50 @@ class SensorManager:
     def _save_sensor_data(self, path, setup_name=None):
         """
         Save sensor outputs from all sensors to path.
+        Uses adaptive polling for sensor readiness and threaded I/O.
         """
         if not os.path.exists(path):
             os.makedirs(path)
 
-        def save_sensor_data(sensor, sensor_path, sensor_type):
-            if sensor_type == "sensor.lidar.ray_cast":
-                sensor.save_sensor_data(sensor_path + "_lidar.ply")
-            else:
-                sensor.save_sensor_data(sensor_path + "_" + sensor_type.split(".")[-1] + ".png")
-
+        # Adaptive polling: start at 1ms, double up to 50ms
         t0 = time()
+        sleep_time = 0.001
         while not self._check_sensor_ready():
-            sleep(0.1)
+            sleep(sleep_time)
+            sleep_time = min(sleep_time * 2, 0.05)
         self.logger.info(f" Sensor ready, saving sensor output. Took {time() - t0} seconds.")
 
+        # Collect all save tasks
+        save_tasks = []
         if not self.temporary:
             for sensor_type, sensors in self.sensors.items():
                 for i, sensor in enumerate(sensors):
                     if sensor_type == "sensor.lidar.ray_cast":
-                        sensor.save_sensor_data(os.path.join(path, str(i) + "_lidar.ply"))
+                        save_tasks.append((sensor, os.path.join(path, str(i) + "_lidar.ply")))
                     else:
-                        sensor.save_sensor_data(os.path.join(path, str(i) + "_" + sensor_type.split(".")[-1] + ".png"))
+                        save_tasks.append(
+                            (sensor, os.path.join(path, str(i) + "_" + sensor_type.split(".")[-1] + ".png"))
+                        )
         else:
             for sensor_type, sensors in self.sensors.items():
                 for _i, sensor in enumerate(sensors):
                     if sensor_type == "sensor.camera.rgb":
-                        sensor.save_sensor_data(
-                            os.path.join(
-                                path,
-                                str(setup_name) + "_no_vehicles_" + sensor_type.split(".")[-1] + ".png",
+                        save_tasks.append(
+                            (
+                                sensor,
+                                os.path.join(
+                                    path,
+                                    str(setup_name) + "_no_vehicles_" + sensor_type.split(".")[-1] + ".png",
+                                ),
                             )
                         )
+
+        # Save in parallel using threads (I/O-bound work)
+        if len(save_tasks) > 1:
+            with ThreadPoolExecutor(max_workers=min(len(save_tasks), 8)) as pool:
+                pool.map(lambda task: task[0].save_sensor_data(task[1]), save_tasks)
+        elif save_tasks:
+            save_tasks[0][0].save_sensor_data(save_tasks[0][1])
 
         self._reset_sensor_ready()
 
@@ -561,11 +572,7 @@ class SensorManager:
                 or len(set(self.spawn_transforms_cams["height"])) > 1
                 or len(set(self.spawn_transforms_cams["width"])) > 1
             ):
-                intrinsics = self.get_camera_intrinsics_from_fov(
-                    self.spawn_transforms_cams["fov"][i],
-                    self.spawn_transforms_cams["width"][i],
-                    self.spawn_transforms_cams["height"][i],
-                )
+                intrinsics = self._cached_intrinsics[i]
                 frame["fl_x"] = intrinsics["fx"]
                 frame["fl_y"] = intrinsics["fy"]
                 frame["cx"] = intrinsics["cx"]

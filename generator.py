@@ -117,23 +117,29 @@ class Generator:
 
         flags = ["-carla-server", "-RenderOffScreen", "-nosound", "-quality-level=Epic"]
         command = [self.carla_executable, *flags]
-        # potentially add: stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.carla_process = subprocess.Popen(command)
-        # this timer might cause problems - if not starting up increase the value!
-        sleep(15)  # previous 15
 
-        while self.carla_process.poll() is None:
+        # Exponential backoff: try connecting starting at 2s, doubling up to 16s
+        # This replaces the old hardcoded sleep(15) + sleep(1) retry loop
+        backoff = 2.0
+        max_backoff = 16.0
+        max_total_wait = 120.0
+        total_waited = 0.0
+
+        while self.carla_process.poll() is None and total_waited < max_total_wait:
+            sleep(backoff)
+            total_waited += backoff
             try:
                 self.client = carla.Client(self.config["carla"]["host"], self.config["carla"]["port"])
                 self.client.set_timeout(self.config["carla"]["timeout"])
                 self.world = self.client.get_world()
                 self._setup_world()
                 self._set_weather()
-                self.logger.info(" Connected to the CARLA server")
+                self.logger.info(f" Connected to the CARLA server after {total_waited:.1f}s")
                 return
             except Exception:
-                # logger.exception("Error occurred while connecting to the CARLA server")
-                sleep(1)
+                self.logger.debug(f" CARLA not ready after {total_waited:.1f}s, retrying...")
+                backoff = min(backoff * 2, max_backoff)
 
         self.logger.error("CARLA process exited unexpectedly. Could not connect.")
         raise RuntimeError("CARLA process exited unexpectedly. Could not connect.")
@@ -297,11 +303,12 @@ class Generator:
 
                 actors = self.world.get_actors()
                 sens = [actor for actor in actors if actor.type_id.startswith("sensor")]
+                vehicles = [actor for actor in actors if actor.type_id.startswith("vehicle")]
                 self.logger.info(
                     " Amount actors: %d, Amount sensors: %d, Amount vehicles: %d",
                     len(actors),
                     len(sens),
-                    len(self.world.get_actors().filter("vehicle.*")),
+                    len(vehicles),
                 )
 
                 ego_path = os.path.join(
@@ -656,6 +663,11 @@ if __name__ == "__main__":
 
     try:
         config = load_scenario_config(args.config)
+
+        # Allow overriding CARLA port via environment (for parallel execution)
+        carla_port = os.environ.get("CARLA_PORT")
+        if carla_port:
+            config["carla"]["port"] = int(carla_port)
 
         # Resolve relative transform_file paths relative to the config file
         config_dir = os.path.dirname(os.path.abspath(args.config))

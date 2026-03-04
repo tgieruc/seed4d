@@ -4,13 +4,12 @@
 # ==============================================================================
 
 import os
+import tempfile
 
 import carla
 from PIL import Image
 
 from common.sensor import BEVCamera, SensorManager
-
-# from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class Vehicle:
@@ -65,14 +64,19 @@ class Vehicle:
 
     def set_BEV(self):
         self.bev_camera = BEVCamera(self.world, self.vehicle, self.logger)
-        self.bev_imgs = []
+        self._bev_tmpdir = tempfile.mkdtemp(prefix="bev_")
+        self._bev_frame_count = 0
 
     def save_data(self, data_dir):
         for setup_name, sensor_manager in self.sensors.items():
             sensor_manager.save_data(os.path.join(data_dir, setup_name))
 
         if self.bev_camera:
-            self.bev_imgs.append(self.bev_camera.get_sensor_data().copy())
+            # Write BEV frame to disk immediately instead of accumulating in RAM
+            frame = self.bev_camera.get_sensor_data()
+            img = Image.fromarray(frame[:, :, ::-1]).convert("RGB")
+            img.save(os.path.join(self._bev_tmpdir, f"frame_{self._bev_frame_count:06d}.png"))
+            self._bev_frame_count += 1
 
     def save_invisible_data(self, data_dir, suffix="_invisible"):
         for setup_name, sensor_manager in self.invisible_sensors.items():
@@ -85,18 +89,28 @@ class Vehicle:
         return self.vehicle.get_transform()
 
     def save_bev(self, save_path):
-        bev_PIL = [Image.fromarray(image[:, :, ::-1]).convert("RGB") for image in self.bev_imgs]
-        if len(bev_PIL) > 1:
-            bev_PIL[0].save(
+        # Load frames from disk one at a time to build the GIF
+        frame_files = sorted(f for f in os.listdir(self._bev_tmpdir) if f.startswith("frame_"))
+        if not frame_files:
+            return
+
+        frames = [Image.open(os.path.join(self._bev_tmpdir, f)) for f in frame_files]
+        if len(frames) > 1:
+            frames[0].save(
                 save_path,
                 save_all=True,
-                append_images=bev_PIL[1:],
+                append_images=frames[1:],
                 duration=100,
                 optimize=True,
                 loop=0,
             )
         else:
-            bev_PIL[0].save(save_path)
+            frames[0].save(save_path)
+
+        # Cleanup temp files
+        for f in frame_files:
+            os.remove(os.path.join(self._bev_tmpdir, f))
+        os.rmdir(self._bev_tmpdir)
 
     def destroy(self):
         for _setup_name, sensor_manager in self.sensors.items():
