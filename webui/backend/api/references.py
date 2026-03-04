@@ -83,6 +83,41 @@ def list_vehicles() -> list[str]:
     return VEHICLES
 
 
+@router.get("/api/configs/filesystem")
+def list_filesystem_configs() -> list[dict]:
+    """List existing YAML config files from the config/ directory."""
+    configs = []
+    if not CONFIG_DIR.exists():
+        return configs
+    for yaml_file in sorted(CONFIG_DIR.glob("*.yaml")):
+        with open(yaml_file) as f:
+            content = f.read()
+        configs.append(
+            {
+                "name": yaml_file.stem,
+                "filename": yaml_file.name,
+                "path": str(yaml_file.relative_to(PROJECT_ROOT)),
+                "content": content,
+            }
+        )
+    # Also scan subdirectories (e.g., config/dynamic/)
+    for subdir in sorted(CONFIG_DIR.iterdir()):
+        if not subdir.is_dir() or subdir.name in ("camera", "lidar"):
+            continue
+        for yaml_file in sorted(subdir.glob("*.yaml")):
+            with open(yaml_file) as f:
+                content = f.read()
+            configs.append(
+                {
+                    "name": f"{subdir.name}/{yaml_file.stem}",
+                    "filename": yaml_file.name,
+                    "path": str(yaml_file.relative_to(PROJECT_ROOT)),
+                    "content": content,
+                }
+            )
+    return configs
+
+
 @router.get("/api/camera-rigs")
 def list_camera_rigs() -> list[dict]:
     rigs = []

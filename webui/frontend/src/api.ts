@@ -28,6 +28,10 @@ export const deleteConfig = (id: string) =>
 export const validateConfig = (id: string) =>
   fetchJSON<{ valid: boolean; errors: string[] }>(`/api/configs/${id}/validate`, { method: 'POST' })
 
+// Filesystem configs (existing YAML files in config/)
+export const listFilesystemConfigs = () =>
+  fetchJSON<{ name: string; filename: string; path: string; content: string }[]>('/api/configs/filesystem')
+
 // References
 export const listMaps = () => fetchJSON<string[]>('/api/maps')
 export const listWeathers = () => fetchJSON<string[]>('/api/weathers')
