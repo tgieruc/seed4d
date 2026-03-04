@@ -147,4 +147,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
 
-# Example: python3.8 utils/converter.py
+# Example: python3 utils/converter.py

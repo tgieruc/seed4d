@@ -83,4 +83,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
     
-# RUN: python3.8 check_dataset.py --data_dir /seed4d/data/static --category static
+# RUN: python3 check_dataset.py --data_dir /seed4d/data/static --category static

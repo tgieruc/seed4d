@@ -63,4 +63,4 @@ if __name__ == "__main__":
     
     main(args)
     
-# Example: python3.8 vis_timesteps.py --path /seed4d/data/dynamic/Town10HD/ClearNoon/vehicle.mini.cooper_s/spawn_point_12
+# Example: python3 vis_timesteps.py --path /seed4d/data/dynamic/Town10HD/ClearNoon/vehicle.mini.cooper_s/spawn_point_12

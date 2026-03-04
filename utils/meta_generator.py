@@ -42,7 +42,7 @@ def main(args):
 
     # generate data
     command = [
-        "python3.8",
+        "python3",
         "generator.py",
         "--config",
         args.config,
@@ -73,7 +73,7 @@ def main(args):
     if args.add_date:
         logger.info(" Generate normalize coordinates ...")
         command = [
-            "python3.8",
+            "python3",
             "generate_normalized_coordinates.py",
             "--data_dir",
             args.data_dir,
@@ -87,7 +87,7 @@ def main(args):
         logger.info(" Generate vehicle masks ...")
         args.data_dir = save_path + "/"
         command = [
-            "python3.8",
+            "python3",
             "generate_masks.py",
             "--data_dir",
             args.data_dir,
@@ -98,7 +98,7 @@ def main(args):
     if args.combine_transforms:
         logger.info(" Combining transform files across timepoints ...")
         command = [
-            "python3.8",
+            "python3",
             "generate_single_transforms.py",
             "--data_dir",
             args.data_dir,
@@ -108,7 +108,7 @@ def main(args):
 
     if args.map:
         logger.info(" Generate overview map and single positions file ...")
-        command = ["python3.8", "generate_map.py", "--data_dir", args.data_dir]
+        command = ["python3", "generate_map.py", "--data_dir", args.data_dir]
         process = subprocess.Popen(command, cwd=cwd + "utils")
         process.wait()
 

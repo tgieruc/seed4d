@@ -71,4 +71,4 @@ if __name__ == "__main__":
     
     main(args)
 
-# Example static: python3.8 vis_lidar.py --lidar_path /seed4d/data/static/Town01/ClearNoon/vehicle.mini.cooper_s/spawn_point_1/step_0/ego_vehicle/nuscenes_lidar/sensors/0_lidar.ply
+# Example static: python3 vis_lidar.py --lidar_path /seed4d/data/static/Town01/ClearNoon/vehicle.mini.cooper_s/spawn_point_1/step_0/ego_vehicle/nuscenes_lidar/sensors/0_lidar.ply

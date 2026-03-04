@@ -321,5 +321,5 @@ if __name__ == "__main__":
 
 # IMPORTANT: only implemented currently for the ego vehicle
 
-# Example static: python3.8 vis_all_sensors.py --path /seed4d/data/static/Town02/ClearNoon/vehicle.mini.cooper_s/spawn_point_1/step_0/ --category static
-# Example dynamic: python3.8 vis_all_sensors.py --path /seed4d/data/dynamic/Town01/ClearNoon/vehicle.mini.cooper_s/spawn_point_4/step_0/ --category dynamic
+# Example static: python3 vis_all_sensors.py --path /seed4d/data/static/Town02/ClearNoon/vehicle.mini.cooper_s/spawn_point_1/step_0/ --category static
+# Example dynamic: python3 vis_all_sensors.py --path /seed4d/data/dynamic/Town01/ClearNoon/vehicle.mini.cooper_s/spawn_point_4/step_0/ --category dynamic

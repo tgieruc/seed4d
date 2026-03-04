@@ -45,7 +45,7 @@ def main(args):
         logger.info("Generate data...")
         args.config = yaml_file_path
         command = [
-            "python3.8",
+            "python3",
             "meta_generator.py",
             "--config",
             args.config,

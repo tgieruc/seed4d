@@ -70,7 +70,7 @@ def main(args):
         # "--quiet",
         process = psutil.Popen(
             [
-                "python3.8",
+                "python3",
                 "generator.py",
                 "--config",
                 config,
@@ -102,7 +102,7 @@ def main(args):
         if args.normalize_coords:
             logger.info(" Normalize coordinates ...")
             command = [
-                "python3.8",
+                "python3",
                 "/seed4d/utils/generate_normalized_coordinates.py",
                 "--data_dir",
                 save_path,
@@ -116,7 +116,7 @@ def main(args):
         if args.vehicle_masks:
             logger.info(" Generate vehicle masks ...")
             command = [
-                "python3.8",
+                "python3",
                 "/seed4d/utils/generate_masks.py",
                 "--data_dir",
                 save_path + "/",
@@ -128,7 +128,7 @@ def main(args):
         if args.combine_transforms:
             logger.info(" Combining transform files across timepoints ...")
             command = [
-                "python3.8",
+                "python3",
                 "/seed4d/utils/generate_single_transforms.py",
                 "--data_dir",
                 save_path + "/",
@@ -139,7 +139,7 @@ def main(args):
         # create single overview map
         if args.map:
             logger.info(" Generate overview map and single position file ...")
-            command = ["python3.8", "/seed4d/utils/generate_map.py", "--data_dir", save_path + "/"]
+            command = ["python3", "/seed4d/utils/generate_map.py", "--data_dir", save_path + "/"]
             process = subprocess.Popen(command, cwd=cwd)
             process.wait()
         
@@ -179,7 +179,7 @@ if __name__ == "__main__":
         default=False,
         help="Only generate data for configs that don't already have data",
     )
-    parser.add_argument("--carla_executable", type=str, default="/home/carla/CarlaUE4.sh", help="Location of the CarlaUE4.sh executable")
+    parser.add_argument("--carla_executable", type=str, default="/workspace/CarlaUE4.sh", help="Location of the CarlaUE4.sh executable")
     parser.add_argument("--data_dir", type=str, default="data")
     parser.add_argument(
         "--normalize_coords",

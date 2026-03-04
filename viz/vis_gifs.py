@@ -139,5 +139,5 @@ if __name__ == "__main__":
 
     main(args)
     
-# Example: python3.8 vis_gifs.py --path /seed4d/data/dynamic/Town10HD/ClearNoon/vehicle.mini.cooper_s/spawn_point_16/step_0/ --vehicles 71 72 73 76 ego_vehicle
-# Example: python3.8 vis_gifs.py --path /seed4d/data/dynamic/Town10HD/ClearNoon/vehicle.mini.cooper_s/spawn_point_4/step_0/ --vehicles 71
+# Example: python3 vis_gifs.py --path /seed4d/data/dynamic/Town10HD/ClearNoon/vehicle.mini.cooper_s/spawn_point_16/step_0/ --vehicles 71 72 73 76 ego_vehicle
+# Example: python3 vis_gifs.py --path /seed4d/data/dynamic/Town10HD/ClearNoon/vehicle.mini.cooper_s/spawn_point_4/step_0/ --vehicles 71

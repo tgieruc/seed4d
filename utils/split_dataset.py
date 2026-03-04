@@ -84,4 +84,4 @@ if __name__ == "__main__":
 
     split_dataset(args.data_dir, args.split_ratio)
     
-# Example: python3.8 utils/split_dataset.py --data_dir /seed4d/data/static
+# Example: python3 utils/split_dataset.py --data_dir /seed4d/data/static

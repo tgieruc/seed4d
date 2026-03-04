@@ -141,5 +141,5 @@ if __name__ == "__main__":
     
     main(args)
 
-# Example static: python3.8 get_point_cloud.py --path /seed4d/data/static/Town01/ClearNoon/vehicle.mini.cooper_s/spawn_point_1/step_0 --voxel_size 0.1 --viewpoint nuscenes sphere
-# Example dynamic: python3.8 get_point_cloud.py --path /seed4d/data/dynamic/Town01/ClearNoon/vehicle.mini.cooper_s/spawn_point_12/step_0 --vehicles 371 372 373 ego_vehicle --voxel_size 0.1 --viewpoint nuscenes sphere
+# Example static: python3 get_point_cloud.py --path /seed4d/data/static/Town01/ClearNoon/vehicle.mini.cooper_s/spawn_point_1/step_0 --voxel_size 0.1 --viewpoint nuscenes sphere
+# Example dynamic: python3 get_point_cloud.py --path /seed4d/data/dynamic/Town01/ClearNoon/vehicle.mini.cooper_s/spawn_point_12/step_0 --vehicles 371 372 373 ego_vehicle --voxel_size 0.1 --viewpoint nuscenes sphere

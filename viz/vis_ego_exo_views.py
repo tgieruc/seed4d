@@ -70,4 +70,4 @@ if __name__ == "__main__":
     
     main(args)
     
-# example: python3.8 vis_ego_exo_views.py --path /seed4d/data/static --towns 01 02 --spawnpoints 4 8 15
+# example: python3 vis_ego_exo_views.py --path /seed4d/data/static --towns 01 02 --spawnpoints 4 8 15
