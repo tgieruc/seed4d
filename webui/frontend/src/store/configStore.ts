@@ -153,7 +153,59 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
 
   reset: () => set(DEFAULTS),
 
-  loadFromYAML: (_yamlStr: string) => {
-    // TODO: parse YAML and populate form
+  loadFromYAML: (yamlStr: string) => {
+    try {
+      const raw = yaml.load(yamlStr) as Record<string, any>
+      if (!raw || typeof raw !== 'object') return
+
+      // Parse datasets from YAML structure
+      const datasets: SensorDataset[] = []
+      if (raw.dataset && typeof raw.dataset === 'object') {
+        for (const [name, entry] of Object.entries(raw.dataset as Record<string, any>)) {
+          const si = entry.sensor_info || {}
+          datasets.push({
+            name,
+            attached_to_vehicle: entry.attached_to_vehicle ?? true,
+            sensor_types: Array.isArray(si.type) ? si.type : [],
+            fov: si.fov ?? 90,
+            width: si.width ?? 1600,
+            height: si.height ?? 900,
+            camera_rig_file: entry.transform_file_cams ?? 'camera/nuscenes/nuscenes_adjusted.json',
+            channels: si.channels,
+            points_per_second: si.points_per_second,
+            rotation_frequency: si.rotation_frequency,
+            range: si.range,
+          })
+        }
+      }
+
+      const carla = raw.carla || {}
+
+      set({
+        map: raw.map ?? DEFAULTS.map,
+        weather: raw.weather ?? DEFAULTS.weather,
+        vehicle: raw.vehicle ?? DEFAULTS.vehicle,
+        spawn_points: Array.isArray(raw.spawn_point) ? raw.spawn_point : [raw.spawn_point ?? 1],
+        steps: raw.steps ?? DEFAULTS.steps,
+        min_distance: raw.min_distance ?? DEFAULTS.min_distance,
+        synchronous_mode: carla.synchronous_mode ?? DEFAULTS.synchronous_mode,
+        fixed_delta_seconds: carla.fixed_delta_seconds ?? DEFAULTS.fixed_delta_seconds,
+        timeout: carla.timeout ?? DEFAULTS.timeout,
+        number_of_vehicles: raw.number_of_vehicles ?? DEFAULTS.number_of_vehicles,
+        number_of_walkers: raw.number_of_walkers ?? DEFAULTS.number_of_walkers,
+        large_vehicles: raw.large_vehicles ?? DEFAULTS.large_vehicles,
+        sort_spawnpoints: raw.sort_spawnpoints ?? DEFAULTS.sort_spawnpoints,
+        datasets: datasets.length > 0 ? datasets : DEFAULTS.datasets,
+        bev_camera: raw.BEVCamera ?? DEFAULTS.bev_camera,
+        invisible_ego: raw.invisible_ego ?? raw.invisible ?? DEFAULTS.invisible_ego,
+        three_d_boundingbox: raw['3Dboundingbox'] ?? DEFAULTS.three_d_boundingbox,
+        normalize_coords: DEFAULTS.normalize_coords,
+        vehicle_masks: DEFAULTS.vehicle_masks,
+        combine_transforms: DEFAULTS.combine_transforms,
+        generate_map: DEFAULTS.generate_map,
+      })
+    } catch {
+      console.error('Failed to parse YAML')
+    }
   },
 }))
