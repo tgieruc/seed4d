@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useConfigStore, type SensorDataset } from '../store/configStore'
 import { listMaps, listWeathers, listVehicles, listCameraRigs, listFilesystemConfigs, listConfigs, createConfig, submitJob } from '../api'
 import ScenePreview from '../components/ScenePreview'
+import { useToastStore } from '../store/toastStore'
 
 const SENSOR_TYPES = [
   'sensor.camera.rgb',
@@ -36,6 +37,7 @@ const selectCls = inputCls
 
 function ImportSection() {
   const loadFromYAML = useConfigStore((s) => s.loadFromYAML)
+  const addToast = useToastStore((s) => s.addToast)
   const [showDropdown, setShowDropdown] = useState(false)
   const { data: fsConfigs = [] } = useQuery({
     queryKey: ['filesystem-configs'],
@@ -51,11 +53,13 @@ function ImportSection() {
   function handleImportFS(content: string, name: string) {
     loadFromYAML(content)
     setShowDropdown(false)
+    addToast(`Loaded config: ${name}`, 'success')
   }
 
-  function handleImportSaved(yamlContent: string) {
+  function handleImportSaved(yamlContent: string, name: string) {
     loadFromYAML(yamlContent)
     setShowDropdown(false)
+    addToast(`Loaded config: ${name}`, 'success')
   }
 
   return (
@@ -94,7 +98,7 @@ function ImportSection() {
               {savedConfigs.map((cfg) => (
                 <button
                   key={cfg.id}
-                  onClick={() => handleImportSaved(cfg.yaml_content)}
+                  onClick={() => handleImportSaved(cfg.yaml_content, cfg.name)}
                   className="w-full text-left px-3 py-2 text-sm hover:bg-gray-800 flex justify-between items-center"
                 >
                   <span className="text-gray-200">{cfg.name}</span>
@@ -389,6 +393,7 @@ function ActionsSection() {
   const map = useConfigStore((s) => s.map)
   const weather = useConfigStore((s) => s.weather)
   const queryClient = useQueryClient()
+  const addToast = useToastStore((s) => s.addToast)
   const [saving, setSaving] = useState(false)
   const [yamlPreview, setYamlPreview] = useState<string | null>(null)
 
@@ -399,6 +404,9 @@ function ActionsSection() {
       const name = `${map}_${weather}_${new Date().toISOString().slice(0, 16)}`
       await createConfig(name, yamlContent)
       queryClient.invalidateQueries({ queryKey: ['configs'] })
+      addToast('Config saved successfully', 'success')
+    } catch (e) {
+      addToast(`Failed to save: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error')
     } finally {
       setSaving(false)
     }
@@ -413,6 +421,9 @@ function ActionsSection() {
       await submitJob(config.id)
       queryClient.invalidateQueries({ queryKey: ['configs'] })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      addToast('Job submitted successfully', 'success')
+    } catch (e) {
+      addToast(`Failed to submit: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error')
     } finally {
       setSaving(false)
     }
