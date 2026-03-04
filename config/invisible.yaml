@@ -26,8 +26,8 @@ dataset:
       - sensor.camera.instance_segmentation
       - sensor.camera.depth
       - sensor.lidar.ray_cast
-    transform_file_cams: /mariustheo/Generator/config/camera/nuscenes/nuscenes_adjusted.json
-    transform_file_lidar: /mariustheo/Generator/config/lidar/nuscenes/nuscenes_adjusted.json
+    transform_file_cams: camera/nuscenes/nuscenes_adjusted.json
+    transform_file_lidar: lidar/nuscenes/nuscenes_adjusted.json
   sphere:
     attached_to_vehicle: true
     sensor_info:
@@ -40,7 +40,7 @@ dataset:
       - sensor.camera.semantic_segmentation
       - sensor.camera.instance_segmentation
       - sensor.camera.depth
-    transform_file_cams: /mariustheo/Generator/config/camera/sphere/sphere.json
+    transform_file_cams: camera/sphere/sphere.json
 invisible: true
 3Dboundingbox: true
 map: Town01

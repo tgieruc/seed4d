@@ -702,6 +702,22 @@ if __name__ == "__main__":
     try:
         with open(args.config, "r") as f:
             config = yaml.safe_load(f)
+
+        # Resolve relative transform_file paths relative to the config file
+        config_dir = os.path.dirname(os.path.abspath(args.config))
+        for section in ("dataset", ):
+            for setup_name, sensor_config in config.get(section, {}).items():
+                for key in ("transform_file_cams", "transform_file_lidar"):
+                    path = sensor_config.get(key)
+                    if path and not os.path.isabs(path):
+                        sensor_config[key] = os.path.normpath(os.path.join(config_dir, path))
+        # Also handle traffic_vehicles.dataset
+        for setup_name, sensor_config in config.get("traffic_vehicles", {}).get("dataset", {}).items():
+            for key in ("transform_file_cams", "transform_file_lidar"):
+                path = sensor_config.get(key)
+                if path and not os.path.isabs(path):
+                    sensor_config[key] = os.path.normpath(os.path.join(config_dir, path))
+
         with Generator(
             args.config,
             config,
