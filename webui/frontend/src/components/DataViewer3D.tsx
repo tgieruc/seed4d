@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { useQuery } from '@tanstack/react-query'
 import { getTransforms } from '../api'
 
-function CameraFrustum({ matrix, index }: { matrix: number[][]; index: number }) {
+function CameraFrustum({ matrix }: { matrix: number[][] }) {
   const mat = new THREE.Matrix4()
   mat.set(
     matrix[0][0], matrix[0][1], matrix[0][2], matrix[0][3],
@@ -56,7 +56,7 @@ function TransformFrustums({ path, step }: { path: string; step: string }) {
       {frames.map((frame: any, i: number) => {
         const m = frame.transform_matrix
         if (!m || m.length < 4) return null
-        return <CameraFrustum key={i} matrix={m} index={i} />
+        return <CameraFrustum key={i} matrix={m} />
       })}
     </>
   )
