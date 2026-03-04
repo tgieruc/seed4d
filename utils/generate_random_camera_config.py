@@ -15,22 +15,20 @@ import math
 import os
 import random
 
-
 # Vehicle-mounted camera bounds (meters, radians)
 POSITION_BOUNDS = {
-    "x": (-1.5, 2.0),   # longitudinal (negative=rear, positive=front)
-    "y": (-1.0, 1.0),   # lateral (negative=right, positive=left)
-    "z": (1.0, 2.5),    # height above ground
+    "x": (-1.5, 2.0),  # longitudinal (negative=rear, positive=front)
+    "y": (-1.0, 1.0),  # lateral (negative=right, positive=left)
+    "z": (1.0, 2.5),  # height above ground
 }
 PITCH_BOUNDS = (-math.pi / 4, math.pi / 6)  # -45° to +30° (radians)
-YAW_BOUNDS = (0, 2 * math.pi)               # full 360° (radians)
-FOV_BOUNDS = (60.0, 120.0)                   # degrees
+YAW_BOUNDS = (0, 2 * math.pi)  # full 360° (radians)
+FOV_BOUNDS = (60.0, 120.0)  # degrees
 MIN_CAMS = 1
 MAX_CAMS = 6
 
 
-def generate_random_camera_config(num_cameras="random", seed=None,
-                                   min_cams=MIN_CAMS, max_cams=MAX_CAMS):
+def generate_random_camera_config(num_cameras="random", seed=None, min_cams=MIN_CAMS, max_cams=MAX_CAMS):
     """Generate a random camera configuration dict.
 
     Args:
@@ -83,45 +81,22 @@ def save_camera_config(config, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate random camera configurations for seed4d"
-    )
-    parser.add_argument(
-        "--num-cameras", type=str, default="random",
-        help="Number of cameras (int or 'random')"
-    )
-    parser.add_argument(
-        "--count", type=int, default=1,
-        help="Number of configs to generate (for batch mode)"
-    )
-    parser.add_argument(
-        "--seed", type=int, default=None,
-        help="Base random seed"
-    )
-    parser.add_argument(
-        "--output", type=str, default=None,
-        help="Output JSON path (single config mode)"
-    )
-    parser.add_argument(
-        "--output-dir", type=str, default=None,
-        help="Output directory (batch mode)"
-    )
-    parser.add_argument(
-        "--min-cams", type=int, default=MIN_CAMS,
-        help="Minimum cameras when --num-cameras=random"
-    )
-    parser.add_argument(
-        "--max-cams", type=int, default=MAX_CAMS,
-        help="Maximum cameras when --num-cameras=random"
-    )
+    parser = argparse.ArgumentParser(description="Generate random camera configurations for seed4d")
+    parser.add_argument("--num-cameras", type=str, default="random", help="Number of cameras (int or 'random')")
+    parser.add_argument("--count", type=int, default=1, help="Number of configs to generate (for batch mode)")
+    parser.add_argument("--seed", type=int, default=None, help="Base random seed")
+    parser.add_argument("--output", type=str, default=None, help="Output JSON path (single config mode)")
+    parser.add_argument("--output-dir", type=str, default=None, help="Output directory (batch mode)")
+    parser.add_argument("--min-cams", type=int, default=MIN_CAMS, help="Minimum cameras when --num-cameras=random")
+    parser.add_argument("--max-cams", type=int, default=MAX_CAMS, help="Maximum cameras when --num-cameras=random")
     args = parser.parse_args()
 
     num_cams = args.num_cameras if args.num_cameras == "random" else int(args.num_cameras)
 
     if args.count == 1 and args.output:
         config = generate_random_camera_config(
-            num_cameras=num_cams, seed=args.seed,
-            min_cams=args.min_cams, max_cams=args.max_cams)
+            num_cameras=num_cams, seed=args.seed, min_cams=args.min_cams, max_cams=args.max_cams
+        )
         save_camera_config(config, args.output)
         print(f"Saved {len(config['coordinates'])}-camera config to {args.output}")
     elif args.output_dir:
@@ -129,8 +104,8 @@ def main():
         for i in range(args.count):
             seed = (args.seed + i) if args.seed is not None else None
             config = generate_random_camera_config(
-                num_cameras=num_cams, seed=seed,
-                min_cams=args.min_cams, max_cams=args.max_cams)
+                num_cameras=num_cams, seed=seed, min_cams=args.min_cams, max_cams=args.max_cams
+            )
             n = len(config["coordinates"])
             path = os.path.join(args.output_dir, f"random_{n}cam_{i:04d}.json")
             save_camera_config(config, path)

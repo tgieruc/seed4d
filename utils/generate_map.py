@@ -3,18 +3,18 @@
 # @author: Marius Kästingschäfer and Théo Gieruc
 # ==============================================================================
 
-from matplotlib import pyplot as plt
+import argparse
+import glob
+import json
+import os
+
 import numpy as np
 import pandas as pd
-import json
-import glob
 import yaml
-import os
-import argparse
+from matplotlib import pyplot as plt
 
 
 def get_files_and_vehilce_ids(folder_path):
-
     file_pattern = "*_combined_transforms.json"
     matching_files = glob.glob(folder_path + file_pattern)
 
@@ -33,18 +33,15 @@ def get_files_and_vehilce_ids(folder_path):
 
 
 def extract_trajectory(path):
-
-    with open(path, "r") as json_file:
+    with open(path) as json_file:
         data = json.load(json_file)
 
     x_trajectory, y_trajectory, z_trajectory = [], [], []
 
     for frame in data["frames"]:
-
         # using only the first camera for plotting
         file_path = frame["file_path"]
         if "0_rgb.png" in file_path:
-
             # Extract the transformation matrix
             transform_matrix = frame["transform_matrix"]
 
@@ -62,7 +59,6 @@ def extract_trajectory(path):
 
 
 def plot_positions(trajectories, vehicle_ids, data_dir):
-
     colors = plt.cm.tab10(np.linspace(0, 1, len(vehicle_ids)))
     time = np.linspace(0, 1, len(trajectories[0][0]))
 
@@ -104,7 +100,6 @@ def write_positions(trajectories, vehicle_ids, times, data_dir):
     speeds_df = []
 
     for idx, trajectory in enumerate(trajectories):
-
         # trajectory per vehicle
         vehicle_id = vehicle_ids[idx]
         _, y_trajectory, z_trajectory = trajectory
@@ -134,7 +129,6 @@ def write_positions(trajectories, vehicle_ids, times, data_dir):
 
 
 def main(args):
-
     data_dir = args.data_dir
     file_names, vehicle_ids = get_files_and_vehilce_ids(data_dir)
 
@@ -145,7 +139,7 @@ def main(args):
 
     plot_positions(trajectories, vehicle_ids, data_dir)
 
-    with open(data_dir + "/timesteps.json", "r") as file:
+    with open(data_dir + "/timesteps.json") as file:
         times = yaml.load(file, Loader=yaml.FullLoader)
 
     times = list(times.values())
@@ -153,9 +147,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Write a map containing all vehicle trajectories."
-    )
+    parser = argparse.ArgumentParser(description="Write a map containing all vehicle trajectories.")
     parser.add_argument("--data_dir", type=str, help="Path to the data directory.")
     args = parser.parse_args()
     main(args)

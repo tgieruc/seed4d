@@ -9,15 +9,13 @@ Instead of having a transform file containing the pose information per timestep,
 
 """
 
-import json
 import argparse
+import json
 import os
-from matplotlib import pyplot as plt
-import numpy as np
 
 
 def load_json(path):
-    with open(path, "r") as file:
+    with open(path) as file:
         data = json.load(file)
     return data
 
@@ -31,22 +29,15 @@ def is_integer(s):
 
 
 def main(args):
-
     max_steps = (
         max(
-            (
-                int(item[5:])
-                for item in os.listdir(args.data_dir)
-                if item.startswith("step_")
-            ),
+            (int(item[5:]) for item in os.listdir(args.data_dir) if item.startswith("step_")),
             default=0,
         )
         + 1
     )
     vehicles = [
-        f
-        for f in os.listdir(args.data_dir + "step_0")
-        if os.path.isdir(os.path.join(args.data_dir + "step_0", f))
+        f for f in os.listdir(args.data_dir + "step_0") if os.path.isdir(os.path.join(args.data_dir + "step_0", f))
     ]
 
     transforms = [
@@ -58,54 +49,29 @@ def main(args):
     for transform in transforms:
         for vehicle in vehicles:
             for step in range(max_steps):
-                
-                #print(args.data_dir + "step_"+ str(step)+ '' + "/nuscenes/transforms/"+ transform)
+                # print(args.data_dir + "step_"+ str(step)+ '' + "/nuscenes/transforms/"+ transform)
 
                 # processing dependents on sphere or non-sphere
                 subfolder = "/nuscenes"
                 if vehicle == "sphere":
                     number = ""
-                    json_path = (
-                        args.data_dir
-                        + "step_"
-                        + str(step)
-                        + number
-                        + "/sphere/transforms/"
-                        + transform
-                    )
+                    json_path = args.data_dir + "step_" + str(step) + number + "/sphere/transforms/" + transform
                     subfolder = "/sphere"
-                elif is_integer(vehicle) or vehicle == 'ego_vehicle':
+                elif is_integer(vehicle) or vehicle == "ego_vehicle":
                     number = "/" + vehicle
-                    json_path = (
-                        args.data_dir
-                        + "step_"
-                        + str(step)
-                        + number
-                        + "/nuscenes/transforms/"
-                        + transform
-                    )
+                    json_path = args.data_dir + "step_" + str(step) + number + "/nuscenes/transforms/" + transform
                 else:
-                    print(
-                        "Vehicle input not allowed! Vehicle should be ego or vehicle number"
-                    )
+                    print("Vehicle input not allowed! Vehicle should be ego or vehicle number")
 
                 data = load_json(json_path)
 
                 for idx in range(len(data["frames"])):
                     data["frames"][idx]["file_path"] = (
-                        "../step_"
-                        + str(step)
-                        + number
-                        + subfolder
-                        + data["frames"][idx]["file_path"][2:]
+                        "../step_" + str(step) + number + subfolder + data["frames"][idx]["file_path"][2:]
                     )
                     if args.depth:
                         data["frames"][idx]["depth_file_path"] = (
-                            "../step_"
-                            + str(step)
-                            + number
-                            + subfolder
-                            + data["frames"][idx]["depth_file_path"][2:]
+                            "../step_" + str(step) + number + subfolder + data["frames"][idx]["depth_file_path"][2:]
                         )
                     if args.semantic_segmentation:
                         data["frames"][idx]["semantic_segmentation_file_path"] = (
@@ -131,13 +97,9 @@ def main(args):
                             + subfolder
                             + data["frames"][idx]["optical_flow_file_path"][2:]
                         )
-                    if transform == "transforms_background.json" and args.mask == True:
+                    if transform == "transforms_background.json" and args.mask:
                         data["frames"][idx]["mask_path"] = (
-                            "../step_"
-                            + str(step)
-                            + number
-                            + subfolder
-                            + data["frames"][idx]["mask_path"][2:]
+                            "../step_" + str(step) + number + subfolder + data["frames"][idx]["mask_path"][2:]
                         )
 
                 if step == 0:
@@ -145,9 +107,7 @@ def main(args):
                 else:
                     full_data["frames"] += data["frames"]
 
-            with open(
-                args.data_dir + "/" + str(vehicle) + "_combined_" + transform, "w"
-            ) as file:
+            with open(args.data_dir + "/" + str(vehicle) + "_combined_" + transform, "w") as file:
                 json.dump(full_data, file)
 
 

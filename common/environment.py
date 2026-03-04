@@ -28,7 +28,7 @@ def init_world(town, delta_seconds, weather, unload):
     client = carla.Client("localhost", 2000)
     # this value might need to be adjusted, depending on the server speed
     # one wants to avoid long loading time, but the client (CARLA) needs to be ready when called!
-    client.set_timeout(10.0) #10
+    client.set_timeout(10.0)  # 10
     world = client.load_world(town)
     print("World loaded")
 

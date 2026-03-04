@@ -7,31 +7,26 @@
 Exectues: generate_masks.py, generate_normalized_coordinates.py, generate_single_transforms.py
 """
 
-import sys, os
+import argparse
+import logging
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+import yaml
 
 cwd = "/mariustheo/Generator/"
 sys.path.append(cwd)
 # os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
-import subprocess
-import logging
-import yaml
-import argparse
-import time
-from time import sleep
-from datetime import datetime
-
 
 def main(args):
-
     start_time = time.time()
 
     # configure logging
-    (
-        logging.basicConfig(level=logging.ERROR)
-        if args.quiet
-        else logging.basicConfig(level=logging.INFO)
-    )
+    (logging.basicConfig(level=logging.ERROR) if args.quiet else logging.basicConfig(level=logging.INFO))
     logger = logging.getLogger(__name__)
 
     if args.add_date:
@@ -55,7 +50,7 @@ def main(args):
     process.wait()
 
     # obtain file path
-    with open(args.config, "r") as file:
+    with open(args.config) as file:
         config = yaml.safe_load(file)
     save_path = os.path.join(
         cwd,
@@ -66,9 +61,7 @@ def main(args):
         "spawn_point_" + str(config["spawn_point"][0]),
     )
     args.data_dir = save_path
-    logger.info(
-        f" Congratulations! Your data has been written to this location: {args.data_dir}"
-    )
+    logger.info(f" Congratulations! Your data has been written to this location: {args.data_dir}")
 
     if args.add_date:
         logger.info(" Generate normalize coordinates ...")
@@ -119,12 +112,11 @@ def main(args):
     # show elapse time
     elapsed_time = time.time() - start_time
     logger.info(
-        f" Total elapsed time: {int(elapsed_time/60)} minutes {round((elapsed_time - int(elapsed_time/60)*60), 0)} seconds"
+        f" Total elapsed time: {int(elapsed_time / 60)} minutes {round((elapsed_time - int(elapsed_time / 60) * 60), 0)} seconds"
     )
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
         description="Execute to perform generator, generate_mask, generate_normalized_coordinates and generate_single_transforms in one script."
     )
@@ -135,9 +127,7 @@ if __name__ == "__main__":
         default="config.yaml",
         help="Path to the config file",
     )
-    parser.add_argument(
-        "--data_dir", type=str, default="data", help="Path to the data directory"
-    )
+    parser.add_argument("--data_dir", type=str, default="data", help="Path to the data directory")
     parser.add_argument(
         "--quiet",
         "-q",
@@ -169,18 +159,18 @@ if __name__ == "__main__":
         help="Generate vehicle masks + vehicle only images",
     )
     parser.add_argument(
-        "--combine_transforms",	
+        "--combine_transforms",
         type=bool,
         default=False,
         help="Write a single transform across timepoints",
     )
     parser.add_argument(
-        "--map",	
+        "--map",
         type=bool,
         default=False,
         help="Creates a map overview and a single file containing all positions",
     )
-    
+
     args = parser.parse_args()
 
     main(args)

@@ -4,11 +4,9 @@
 # ==============================================================================
 
 import math
-import os
-import json
+
 import carla
 import numpy as np
-from matplotlib import pyplot as plt
 from scipy.spatial.transform import Rotation as R
 
 
@@ -40,9 +38,7 @@ def fibonacci_sphere(span: float, N: int) -> list:
     return points
 
 
-def generate_sphere_transforms(
-    origin: list, z_offset: float, radius: float, N: int
-) -> list:
+def generate_sphere_transforms(origin: list, z_offset: float, radius: float, N: int) -> list:
     """
     Generate 3D coordinates, pitch angles and yaw angles of N evenly distributed points on a sphere centered at origin with
     radius 'radius' and z-offset 'z_offset'.
@@ -63,8 +59,7 @@ def generate_sphere_transforms(
     coordinates = np.array(fibonacci_sphere(1.0, N))
     pitchs = np.arcsin(coordinates[:, 2])
     yaws = np.sign(coordinates[:, 0]) * np.arccos(
-        coordinates[:, 1]
-        / (coordinates[:, 0] ** 2 + coordinates[:, 1] ** 2 + 1e-8) ** 0.5
+        coordinates[:, 1] / (coordinates[:, 0] ** 2 + coordinates[:, 1] ** 2 + 1e-8) ** 0.5
     )
     coordinates = radius * coordinates + origin + z_correction
 
@@ -128,9 +123,7 @@ def generate_nuscenes_transforms():
     yaws = []
 
     for key in transforms:
-        coordinates.append(
-            np.array(transforms[key]["translation"]) * np.array([1, -1, 1])
-        )
+        coordinates.append(np.array(transforms[key]["translation"]) * np.array([1, -1, 1]))
         pitchs.append(transforms[key]["rotation"]["yaw"] / 180 * math.pi)
         yaws.append(-transforms[key]["rotation"]["pitch"] / 180 * math.pi + math.pi)
 
@@ -189,6 +182,7 @@ def carla_to_nerf_unnormalized(camera_transform: carla.Transform):
 
     return openGL_matrix.get_matrix()
 
+
 def extract_xyz_yaw_pitch_roll(matrix: np.ndarray):
     """
     Extract x, y, z, yaw, pitch, and roll from a 4x4 Rt matrix.
@@ -204,6 +198,7 @@ def extract_xyz_yaw_pitch_roll(matrix: np.ndarray):
     pitch = -pitch
 
     return x, y, z, yaw, pitch, roll
+
 
 def carlarpy_to_nerf(spawn_transforms: dict):
     """
@@ -221,9 +216,7 @@ def carlarpy_to_nerf(spawn_transforms: dict):
         pitch = -pitch * (180 / math.pi)
         yaw = -(yaw * (180 / math.pi) + yaw_correction)
 
-        transform_cam = carla.Transform(
-            carla.Location(*coord), carla.Rotation(pitch=pitch, yaw=yaw)
-        )
+        transform_cam = carla.Transform(carla.Location(*coord), carla.Rotation(pitch=pitch, yaw=yaw))
 
         nerf_matrix = carla_to_nerf_normalized(transform_cam)
 
@@ -240,9 +233,7 @@ def get_OpenGL_matrices_normalized(coordinates, pitchs, yaws, origin, RADIUS):
         pitch = -pitch * (180 / math.pi)
         yaw = -(yaw * (180 / math.pi) + yaw_correction)
 
-        transform_cam = carla.Transform(
-            carla.Location(*coord), carla.Rotation(pitch=pitch, yaw=yaw)
-        )
+        transform_cam = carla.Transform(carla.Location(*coord), carla.Rotation(pitch=pitch, yaw=yaw))
 
         nerf_matrix = carla_to_nerf_normalized(transform_cam, origin, RADIUS)
 
@@ -259,9 +250,7 @@ def get_OpenGL_matrices_unnormalized(coordinates, pitchs, yaws, origin, RADIUS):
         pitch = -pitch * (180 / math.pi)
         yaw = -(yaw * (180 / math.pi) + yaw_correction)
 
-        transform_cam = carla.Transform(
-            carla.Location(*coord), carla.Rotation(pitch=pitch, yaw=yaw)
-        )
+        transform_cam = carla.Transform(carla.Location(*coord), carla.Rotation(pitch=pitch, yaw=yaw))
 
         nerf_matrix = carla_to_nerf_unnormalized(transform_cam, origin, RADIUS)
 

@@ -7,19 +7,18 @@ import configargparse
 
 
 def config_parser():
-    '''
+    """
     Parser containing:
         - General options
-        - Dataset options 
+        - Dataset options
         - Model options
         - Checkpoints
         - Iterations & learning rate options
         - Rendering options
         - Logging/saving options
         - Evaluation options
-    '''
+    """
 
-    
     parser = configargparse.ArgumentParser()
     # general
     parser.add_argument("--config", is_config_file=True, help="config file path")
@@ -30,12 +29,8 @@ def config_parser():
         help="the path to the project root directory. Replace this path with yours!",
     )
     parser.add_argument("--expname", type=str, help="experiment name")
-    parser.add_argument(
-        "--distributed", action="store_true", help="if use distributed training"
-    )
-    parser.add_argument(
-        "--local_rank", type=int, default=0, help="rank for distributed training"
-    )
+    parser.add_argument("--distributed", action="store_true", help="if use distributed training")
+    parser.add_argument("--local_rank", type=int, default=0, help="rank for distributed training")
     parser.add_argument(
         "-j",
         "--workers",
@@ -67,9 +62,7 @@ def config_parser():
         default=[],
         help="optional, specify a subset of training scenes from training dataset",
     )
-    parser.add_argument(
-        "--eval_dataset", type=str, default="llff_test", help="the dataset to evaluate"
-    )
+    parser.add_argument("--eval_dataset", type=str, default="llff_test", help="the dataset to evaluate")
     parser.add_argument(
         "--eval_scenes",
         nargs="+",
@@ -81,8 +74,7 @@ def config_parser():
         "--testskip",
         type=int,
         default=8,
-        help="will load 1/N images from test/val sets, "
-        "useful for large datasets like deepvoxels or nerf_synthetic",
+        help="will load 1/N images from test/val sets, useful for large datasets like deepvoxels or nerf_synthetic",
     )
 
     ########## model options ##########
@@ -91,7 +83,7 @@ def config_parser():
         "--sample_mode",
         type=str,
         default="uniform",
-        help="how to sample pixels from images for training:" "uniform|center",
+        help="how to sample pixels from images for training:uniform|center",
     )
     parser.add_argument(
         "--center_ratio",
@@ -136,18 +128,10 @@ def config_parser():
         action="store_true",
         help="if rectify inplane rotation",
     )
-    parser.add_argument(
-        "--coarse_only", action="store_true", help="use coarse network only"
-    )
-    parser.add_argument(
-        "--anti_alias_pooling", type=int, default=1, help="if use anti-alias pooling"
-    )
-    parser.add_argument(
-        "--trans_depth", type=int, default=4, help="number of transformer layers"
-    )
-    parser.add_argument(
-        "--netwidth", type=int, default=64, help="network intermediate dimension"
-    )
+    parser.add_argument("--coarse_only", action="store_true", help="use coarse network only")
+    parser.add_argument("--anti_alias_pooling", type=int, default=1, help="if use anti-alias pooling")
+    parser.add_argument("--trans_depth", type=int, default=4, help="number of transformer layers")
+    parser.add_argument("--netwidth", type=int, default=64, help="network intermediate dimension")
     parser.add_argument(
         "--single_net",
         type=bool,
@@ -156,9 +140,7 @@ def config_parser():
     )
 
     ########## checkpoints ##########
-    parser.add_argument(
-        "--no_reload", action="store_true", help="do not reload weights from saved ckpt"
-    )
+    parser.add_argument("--no_reload", action="store_true", help="do not reload weights from saved ckpt")
     parser.add_argument(
         "--ckpt_path",
         type=str,
@@ -184,9 +166,7 @@ def config_parser():
         default=1e-3,
         help="learning rate for feature extractor",
     )
-    parser.add_argument(
-        "--lrate_gnt", type=float, default=5e-4, help="learning rate for gnt"
-    )
+    parser.add_argument("--lrate_gnt", type=float, default=5e-4, help="learning rate for gnt")
     parser.add_argument(
         "--lrate_decay_factor",
         type=float,
@@ -201,9 +181,7 @@ def config_parser():
     )
 
     ########## rendering options ##########
-    parser.add_argument(
-        "--N_samples", type=int, default=64, help="number of coarse samples per ray"
-    )
+    parser.add_argument("--N_samples", type=int, default=64, help="number of coarse samples per ray")
     parser.add_argument(
         "--N_importance",
         type=int,
@@ -233,15 +211,9 @@ def config_parser():
     )
 
     ########## logging/saving options ##########
-    parser.add_argument(
-        "--i_print", type=int, default=100, help="frequency of terminal printout"
-    )
-    parser.add_argument(
-        "--i_img", type=int, default=500, help="frequency of tensorboard image logging"
-    )
-    parser.add_argument(
-        "--i_weights", type=int, default=10000, help="frequency of weight ckpt saving"
-    )
+    parser.add_argument("--i_print", type=int, default=100, help="frequency of terminal printout")
+    parser.add_argument("--i_img", type=int, default=500, help="frequency of tensorboard image logging")
+    parser.add_argument("--i_weights", type=int, default=10000, help="frequency of weight ckpt saving")
 
     ########## evaluation options ##########
     parser.add_argument(

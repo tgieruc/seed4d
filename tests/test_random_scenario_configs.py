@@ -1,7 +1,5 @@
 import os
-import yaml
 import tempfile
-import pytest
 
 
 def test_generates_valid_yaml():

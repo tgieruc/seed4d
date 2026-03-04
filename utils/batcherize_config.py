@@ -8,8 +8,9 @@ From one config file, create a batch of config files with each one spawnpoint
 """
 
 import argparse
-import yaml
 import os
+
+import yaml
 
 towns_N_spawnpoints = {
     "Town01": 255,
@@ -21,16 +22,14 @@ towns_N_spawnpoints = {
 
 
 def main(args):
-    with open(args.config, "r") as f:
+    with open(args.config) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     os.makedirs(args.output_dir, exist_ok=True)
     town = config["map"]
     for spawnpoint in range(towns_N_spawnpoints[town]):
         config["spawn_point"] = [spawnpoint]
-        with open(
-            os.path.join(args.output_dir, "{}_{}.yaml".format(town, spawnpoint)), "w"
-        ) as f:
+        with open(os.path.join(args.output_dir, f"{town}_{spawnpoint}.yaml"), "w") as f:
             yaml.dump(config, f)
 
 
