@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ConfigBuilder from './pages/ConfigBuilder'
 import JobMonitor from './pages/JobMonitor'
+import DataViewer from './pages/DataViewer'
 
 const queryClient = new QueryClient()
 
@@ -23,10 +24,6 @@ function Layout({ children }: { children: React.ReactNode }) {
       <main className="p-6">{children}</main>
     </div>
   )
-}
-
-function DataViewer() {
-  return <div><h1 className="text-2xl font-bold">Data Viewer</h1><p className="text-gray-400 mt-2">Coming soon...</p></div>
 }
 
 export default function App() {
