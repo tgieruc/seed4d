@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useConfigStore, type SensorDataset } from '../store/configStore'
-import { listMaps, listWeathers, listVehicles, listCameraRigs, createConfig, submitJob } from '../api'
+import { listMaps, listWeathers, listVehicles, listCameraRigs, listFilesystemConfigs, listConfigs, createConfig, submitJob } from '../api'
 import ScenePreview from '../components/ScenePreview'
 
 const SENSOR_TYPES = [
@@ -33,6 +33,84 @@ function Label({ text, children }: { text: string; children: React.ReactNode }) 
 
 const inputCls = 'bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500'
 const selectCls = inputCls
+
+function ImportSection() {
+  const loadFromYAML = useConfigStore((s) => s.loadFromYAML)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const { data: fsConfigs = [] } = useQuery({
+    queryKey: ['filesystem-configs'],
+    queryFn: listFilesystemConfigs,
+    enabled: showDropdown,
+  })
+  const { data: savedConfigs = [] } = useQuery({
+    queryKey: ['configs'],
+    queryFn: listConfigs,
+    enabled: showDropdown,
+  })
+
+  function handleImportFS(content: string, name: string) {
+    loadFromYAML(content)
+    setShowDropdown(false)
+  }
+
+  function handleImportSaved(yamlContent: string) {
+    loadFromYAML(yamlContent)
+    setShowDropdown(false)
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowDropdown(!showDropdown)}
+        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-4 py-2 rounded flex items-center gap-2"
+      >
+        <span>Import Config</span>
+        <span className="text-gray-500">{showDropdown ? '▴' : '▾'}</span>
+      </button>
+      {showDropdown && (
+        <div className="absolute top-full left-0 mt-1 w-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+          {fsConfigs.length > 0 && (
+            <>
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase border-b border-gray-800">
+                Existing Config Files
+              </div>
+              {fsConfigs.map((cfg) => (
+                <button
+                  key={cfg.path}
+                  onClick={() => handleImportFS(cfg.content, cfg.name)}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-800 flex justify-between items-center"
+                >
+                  <span className="text-gray-200">{cfg.name}</span>
+                  <span className="text-gray-500 text-xs">{cfg.filename}</span>
+                </button>
+              ))}
+            </>
+          )}
+          {savedConfigs.length > 0 && (
+            <>
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase border-b border-gray-800">
+                Saved Configs
+              </div>
+              {savedConfigs.map((cfg) => (
+                <button
+                  key={cfg.id}
+                  onClick={() => handleImportSaved(cfg.yaml_content)}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-800 flex justify-between items-center"
+                >
+                  <span className="text-gray-200">{cfg.name}</span>
+                  <span className="text-gray-500 text-xs">{new Date(cfg.updated_at).toLocaleDateString()}</span>
+                </button>
+              ))}
+            </>
+          )}
+          {fsConfigs.length === 0 && savedConfigs.length === 0 && (
+            <div className="px-3 py-4 text-sm text-gray-500 text-center">No configs found</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function WorldSection() {
   const { map, weather, vehicle, set } = useConfigStore()
@@ -373,7 +451,10 @@ export default function ConfigBuilder() {
   return (
     <div className="flex gap-6 h-[calc(100vh-5rem)]">
       <div className="flex-1 overflow-y-auto space-y-4 pr-4">
-        <h1 className="text-2xl font-bold">Config Builder</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Config Builder</h1>
+          <ImportSection />
+        </div>
         <WorldSection />
         <SpawnPointsSection />
         <SimulationSection />
