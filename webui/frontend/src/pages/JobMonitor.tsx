@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { listJobs, cancelJob, rerunJob, connectJobWS } from '../api'
 import type { Job } from '../types'
 
@@ -153,6 +154,7 @@ function JobList({
 }
 
 function JobDetail({ job }: { job: Job }) {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [logLines, setLogLines] = useState<string[]>([])
   const logRef = useRef<HTMLDivElement>(null)
@@ -286,6 +288,14 @@ function JobDetail({ job }: { job: Job }) {
             className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
           >
             {rerunMutation.isPending ? 'Submitting...' : 'Re-run'}
+          </button>
+        )}
+        {job.status === 'completed' && job.data_path && (
+          <button
+            onClick={() => navigate(`/viewer?path=${encodeURIComponent(job.data_path!)}`)}
+            className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 rounded"
+          >
+            View Data
           </button>
         )}
       </div>

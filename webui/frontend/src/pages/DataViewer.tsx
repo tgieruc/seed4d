@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { listDatasets, getTransforms } from '../api'
 import type { DatasetNode } from '../types'
 
@@ -174,11 +175,20 @@ function BevViewer({ path }: { path: string }) {
 }
 
 export default function DataViewer() {
+  const [searchParams] = useSearchParams()
   const { data: datasets = [] } = useQuery({ queryKey: ['datasets'], queryFn: listDatasets })
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [availableSteps, setAvailableSteps] = useState<string[]>([])
   const [selectedStep, setSelectedStep] = useState<string>('step_0')
   const [activeTab, setActiveTab] = useState<'gallery' | '3d' | 'bev'>('gallery')
+
+  // Auto-select dataset from URL query param (e.g., from Job Monitor "View Data" button)
+  useEffect(() => {
+    const pathParam = searchParams.get('path')
+    if (pathParam && !selectedPath) {
+      setSelectedPath(pathParam)
+    }
+  }, [searchParams, selectedPath])
 
   const handleSelect = (path: string, steps: string[]) => {
     setSelectedPath(path)
