@@ -21,6 +21,7 @@ from tqdm import tqdm
 import common.generate_traffic as generate_traffic
 import common.pose as pose
 import common.sensor as sensor
+from common.config import load_scenario_config
 from common.vehicle import Vehicle
 
 
@@ -654,8 +655,7 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     try:
-        with open(args.config) as f:
-            config = yaml.safe_load(f)
+        config = load_scenario_config(args.config)
 
         # Resolve relative transform_file paths relative to the config file
         config_dir = os.path.dirname(os.path.abspath(args.config))
@@ -666,7 +666,8 @@ if __name__ == "__main__":
                     if path and not os.path.isabs(path):
                         sensor_config[key] = os.path.normpath(os.path.join(config_dir, path))
         # Also handle traffic_vehicles.dataset
-        for _setup_name, sensor_config in config.get("traffic_vehicles", {}).get("dataset", {}).items():
+        tv = config.get("traffic_vehicles")
+        for _setup_name, sensor_config in (tv.get("dataset", {}) if tv else {}).items():
             for key in ("transform_file_cams", "transform_file_lidar"):
                 path = sensor_config.get(key)
                 if path and not os.path.isabs(path):

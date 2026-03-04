@@ -130,7 +130,7 @@ def spawn_pedestrians(client, world, number_of_walkers, blueprints_walkers, logg
         if walker_bp.has_attribute("speed"):
             walker_speed.append(walker_bp.get_attribute("speed").recommended_values[1])
         else:
-            print("Walker has no speed")
+            logger.warning("Walker has no speed")
             walker_speed.append(0.0)
         batch.append(carla.command.SpawnActor(walker_bp, spawn_point))
 

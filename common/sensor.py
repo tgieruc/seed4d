@@ -15,6 +15,7 @@ import png
 from PIL import Image
 
 import common.pose as pose
+from common.config import load_camera_config, load_lidar_config
 
 
 class Sensor:
@@ -295,12 +296,16 @@ class SensorManager:
         # self._get_blueprints()
 
         if transform_file_cams:
-            with open(transform_file_cams) as f:
-                self.spawn_transforms_cams = json.load(f)
+            if isinstance(transform_file_cams, str):
+                self.spawn_transforms_cams = load_camera_config(transform_file_cams)
+            else:
+                self.spawn_transforms_cams = transform_file_cams
 
         if transform_file_lidar:
-            with open(transform_file_lidar) as f:
-                self.spawn_transforms_lidar = json.load(f)
+            if isinstance(transform_file_lidar, str):
+                self.spawn_transforms_lidar = load_lidar_config(transform_file_lidar)
+            else:
+                self.spawn_transforms_lidar = transform_file_lidar
 
         self._get_carla_transforms()
 

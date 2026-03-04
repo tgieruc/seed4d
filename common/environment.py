@@ -3,7 +3,11 @@
 # @author: Marius Kästingschäfer and Théo Gieruc
 # ==============================================================================
 
+import logging
+
 import carla
+
+logger = logging.getLogger(__name__)
 
 
 def init_world(town, delta_seconds, weather, unload):
@@ -30,7 +34,7 @@ def init_world(town, delta_seconds, weather, unload):
     # one wants to avoid long loading time, but the client (CARLA) needs to be ready when called!
     client.set_timeout(10.0)  # 10
     world = client.load_world(town)
-    print("World loaded")
+    logger.info("World loaded")
 
     settings = world.get_settings()
     settings.fixed_delta_seconds = delta_seconds
@@ -57,7 +61,7 @@ def init_world(town, delta_seconds, weather, unload):
     if weather in weather_options:
         world.set_weather(weather_options[weather])
     else:
-        print("Weather not found")
+        logger.warning("Weather '%s' not found", weather)
 
     if unload:
         world.unload_map_layer(carla.MapLayer.Buildings)

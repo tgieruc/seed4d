@@ -12,12 +12,13 @@ import psutil
 import yaml
 from tqdm import tqdm
 
-print(" Imports successfull")
+from common.config import load_scenario_config
+
+logger = logging.getLogger(__name__)
 
 
 def data_exists(config, data_dir):
-    with open(config) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
+    config = load_scenario_config(config)
 
     return os.path.exists(
         os.path.join(
@@ -46,11 +47,7 @@ def main(args):
             os.path.join(args.config_dir, f) for f in sorted(os.listdir(args.config_dir)) if f.endswith(".yaml")
         ]
 
-    print(f" Loaded {len(config_files)} config files")
-
-    # configure logging
-    (logging.basicConfig(level=logging.ERROR) if args.quiet else logging.basicConfig(level=logging.INFO))
-    logger = logging.getLogger(__name__)
+    logger.info("Loaded %d config files", len(config_files))
 
     cwd = "/seed4d/utils"
 
@@ -79,8 +76,7 @@ def main(args):
             fails.append(config)
 
         # obtain file path
-        with open(config) as file:
-            config = yaml.safe_load(file)
+        config = load_scenario_config(config)
         save_path = os.path.join(
             args.data_dir,
             config["map"],
@@ -139,7 +135,7 @@ def main(args):
             logger.removeHandler(handler)
 
     if len(fails) > 0:
-        print(f"Failed to generate data for {len(fails)} configs")
+        logger.error("Failed to generate data for %d configs", len(fails))
 
         os.makedirs(os.path.join(args.data_dir, "failed_configs"), exist_ok=True)
         for i, fail_path in enumerate(fails):
@@ -206,7 +202,10 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    print(args)
+
+    logging.basicConfig(level=logging.ERROR if args.quiet else logging.INFO)
+
+    logger.info("Arguments: %s", args)
 
     assert args.config or args.config_dir, "Please specify either a config file or a directory of config files"
 

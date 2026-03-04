@@ -9,6 +9,7 @@ dependencies = [
     "jupyterlab",
     "matplotlib",
     "opencv-python",
+    "pydantic>=2.0",
     "scikit-image",
     "pandas",
     "tqdm",
