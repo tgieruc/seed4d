@@ -103,59 +103,74 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         container = await loop.run_in_executor(None, _detect_docker_container)
         logger.info("Job %s: container=%s", job_id, container)
 
+        # Log file on the mounted volume — readable from both host and container
+        log_file = PROJECT_ROOT / "config" / f"_job_{job_id}.log"
+        log_file.write_text("")
+
         if container:
             # Run inside the Docker container.
             # The project dir is volume-mounted at /seed4d (see docs/datasets.md).
             container_config = "/seed4d/config/" + Path(config_path).name
             container_data = "/seed4d/" + data_dir
-            cmd = [
-                "docker",
-                "exec",
-                "-e",
-                "PYTHONUNBUFFERED=1",
-                container,
-                "python3",
-                "-u",
-                "/seed4d/generator.py",
-                "--config",
-                container_config,
-                "--data_dir",
-                container_data,
-                "--carla_executable",
-                "/workspace/CarlaUE4.sh",
-            ]
+            container_log = "/seed4d/config/" + log_file.name
+            # Use bash to redirect output to a log file on the mounted volume
+            inner_cmd = (
+                f"PYTHONUNBUFFERED=1 python3 -u /seed4d/generator.py"
+                f" --config {container_config}"
+                f" --data_dir {container_data}"
+                f" --carla_executable /workspace/CarlaUE4.sh"
+                f" > {container_log} 2>&1"
+            )
+            cmd = ["docker", "exec", container, "bash", "-c", inner_cmd]
         else:
             logger.warning("No Docker container found — running generator.py on host")
             cmd = [
-                "python3",
-                "-u",
-                str(PROJECT_ROOT / "generator.py"),
-                "--config",
-                config_path,
-                "--data_dir",
-                str(PROJECT_ROOT / data_dir),
+                "bash",
+                "-c",
+                f"PYTHONUNBUFFERED=1 python3 -u {PROJECT_ROOT / 'generator.py'}"
+                f" --config {config_path}"
+                f" --data_dir {PROJECT_ROOT / data_dir}"
+                f" > {log_file} 2>&1",
             ]
 
         process = await asyncio.create_subprocess_exec(
             *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
             cwd=str(PROJECT_ROOT),
         )
         job.pid = process.pid
         db.commit()
 
+        # Tail the log file, streaming lines to WebSocket subscribers
         log_lines: list[str] = []
-        while True:
-            line_bytes = await process.stdout.readline()
-            if not line_bytes:
-                break
-            line = line_bytes.decode(errors="replace")
-            log_lines.append(line)
-            await _broadcast(job_id, {"type": "log", "line": line.rstrip()})
+        while process.returncode is None:
+            # Read any new lines from the log file
+            try:
+                content = log_file.read_text()
+            except OSError:
+                content = ""
+            new_lines = content.split("\n")
+            # Stream only new lines since last read
+            if len(new_lines) > len(log_lines):
+                for line in new_lines[len(log_lines) :]:
+                    if line:
+                        await _broadcast(job_id, {"type": "log", "line": line})
+                log_lines = new_lines
+            # Check if process finished; if not, sleep briefly
+            if process.returncode is None:
+                await asyncio.sleep(1)
+                # Poll the process
+                with contextlib.suppress(Exception):
+                    await asyncio.wait_for(process.wait(), timeout=0.1)
 
-        await process.wait()
-        job.log = "".join(log_lines)
+        # Final read of the log file
+        try:
+            final_log = log_file.read_text()
+        except OSError:
+            final_log = "\n".join(log_lines)
+
+        job.log = final_log
         job.pid = None
 
         if process.returncode == 0:
@@ -181,10 +196,12 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         await _broadcast(job_id, {"type": "status", "status": "failed", "error": str(e)})
     finally:
         _active_job_ids.discard(job_id)
-        # Clean up config file only when job finished (not on server reload)
+        # Clean up config + log files only when job finished (not on server reload)
         if config_path and job and job.status in ("completed", "failed", "cancelled"):
             with contextlib.suppress(OSError):
                 os.unlink(config_path)
+            with contextlib.suppress(OSError):
+                os.unlink(str(PROJECT_ROOT / "config" / f"_job_{job_id}.log"))
         db.close()
 
 
@@ -208,7 +225,7 @@ def mark_active_jobs_failed():
 def cleanup_stale_configs():
     """Remove leftover _job_*.yaml config files from completed/failed jobs."""
     config_dir = PROJECT_ROOT / "config"
-    for f in config_dir.glob("_job_*.yaml"):
+    for f in config_dir.glob("_job_*"):
         with contextlib.suppress(OSError):
             f.unlink()
 
