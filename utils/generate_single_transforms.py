@@ -74,7 +74,7 @@ def main(args):
                         + transform
                     )
                     subfolder = "/sphere"
-                elif is_integer(vehicle) or 'ego_vehicle':
+                elif is_integer(vehicle) or vehicle == 'ego_vehicle':
                     number = "/" + vehicle
                     json_path = (
                         args.data_dir
@@ -131,7 +131,7 @@ def main(args):
                             + subfolder
                             + data["frames"][idx]["optical_flow_file_path"][2:]
                         )
-                    if transforms == "transforms_background.json" and args.masks == True:
+                    if transform == "transforms_background.json" and args.mask == True:
                         data["frames"][idx]["mask_path"] = (
                             "../step_"
                             + str(step)

@@ -203,7 +203,7 @@ def extract_xyz_yaw_pitch_roll(matrix: np.ndarray):
     yaw, pitch, roll = rotmat.as_euler("ZYX", degrees=True)
     pitch = -pitch
 
-    return x, y, z, yaw, roll, pitch
+    return x, y, z, yaw, pitch, roll
 
 def carlarpy_to_nerf(spawn_transforms: dict):
     """

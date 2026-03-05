@@ -156,7 +156,7 @@ def get_bbox_images(folder):
             ego_bbox = bboxes[list(bboxes.keys())[i]]['bb']
             ego_center = np.asarray(ego_bbox).mean(0)
             rgb_bbox = rgb.copy()
-            for i, bbox in enumerate(bbox_array[:-1]):
+            for k, bbox in enumerate(bbox_array[:-1]):
                 if  np.linalg.norm(ego_bbox - bbox.mean(0)) > 150:
                     continue
                 bbox = np.array(bbox) # 8x3

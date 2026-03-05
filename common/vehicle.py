@@ -106,7 +106,7 @@ class Vehicle:
             sensor_manager.destroy()
         if self.bev_camera:
             self.bev_camera.destroy()
-        if self.invisible_sensors:
+        if hasattr(self, 'invisible_sensors') and self.invisible_sensors:
             for setup_name, sensor_manager in self.invisible_sensors.items():
                 sensor_manager.destroy()
         self.vehicle.destroy()
@@ -142,6 +142,8 @@ class Vehicle:
         self.status = "up"
 
     def reset_invisible_sensors(self):
+        if not hasattr(self, 'invisible_sensors'):
+            return
         for setup_name, sensor_manager in self.invisible_sensors.items():
             sensor_manager.reset()
 
