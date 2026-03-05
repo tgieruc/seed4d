@@ -14,7 +14,7 @@ function TreeNode({
 }: {
   node: DatasetNode
   depth: number
-  onSelect: (path: string, steps: string[]) => void
+  onSelect: (path: string, steps: string[], sensorGroups: string[]) => void
   selectedPath: string | null
 }) {
   const [open, setOpen] = useState(depth < 1)
@@ -34,7 +34,7 @@ function TreeNode({
       <button
         onClick={() => {
           if (isSelectable) {
-            onSelect(node.path!, node.steps || [])
+            onSelect(node.path!, node.steps || [], node.sensor_groups || [])
           } else if (hasChildren) {
             setOpen(!open)
           }
@@ -76,7 +76,7 @@ function DatasetTree({
   selectedPath,
 }: {
   nodes: DatasetNode[]
-  onSelect: (path: string, steps: string[]) => void
+  onSelect: (path: string, steps: string[], sensorGroups: string[]) => void
   selectedPath: string | null
 }) {
   if (nodes.length === 0) {
@@ -108,7 +108,7 @@ function StepSelector({
 }) {
   if (steps.length === 0) return null
   return (
-    <div className="flex items-center gap-2 mb-4">
+    <div className="flex items-center gap-2">
       <label className="text-sm text-gray-400">Step:</label>
       <select
         value={selected}
@@ -123,10 +123,11 @@ function StepSelector({
   )
 }
 
-function ImageGallery({ path, step }: { path: string; step: string }) {
+function ImageGallery({ path, step, sensorGroup }: { path: string; step: string; sensorGroup: string }) {
+  const basePath = `${path}/${step}/ego_vehicle/${sensorGroup}`
   const { data: transforms, isLoading } = useQuery({
-    queryKey: ['transforms', path, step],
-    queryFn: () => getTransforms(`${path}/${step}/ego_vehicle/nuscenes`),
+    queryKey: ['transforms', basePath],
+    queryFn: () => getTransforms(basePath),
   })
 
   if (isLoading) return <p className="text-gray-500">Loading transforms...</p>
@@ -142,7 +143,7 @@ function ImageGallery({ path, step }: { path: string; step: string }) {
         return (
           <div key={i} className="border border-gray-700 rounded overflow-hidden">
             <img
-              src={`/api/datasets/${path}/${step}/ego_vehicle/nuscenes/images/${filename}`}
+              src={`/api/datasets/${basePath}/images/${filename}`}
               alt={`Camera ${i}`}
               className="w-full bg-gray-900"
               loading="lazy"
@@ -180,6 +181,8 @@ export default function DataViewer() {
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [availableSteps, setAvailableSteps] = useState<string[]>([])
   const [selectedStep, setSelectedStep] = useState<string>('step_0')
+  const [sensorGroups, setSensorGroups] = useState<string[]>([])
+  const [selectedGroup, setSelectedGroup] = useState<string>('')
   const [activeTab, setActiveTab] = useState<'gallery' | '3d' | 'bev'>('gallery')
 
   // Auto-select dataset from URL query param (e.g., from Job Monitor "View Data" button)
@@ -190,11 +193,15 @@ export default function DataViewer() {
     }
   }, [searchParams, selectedPath])
 
-  const handleSelect = (path: string, steps: string[]) => {
+  const handleSelect = (path: string, steps: string[], groups: string[]) => {
     setSelectedPath(path)
     setAvailableSteps(steps)
+    setSensorGroups(groups)
     if (steps.length > 0 && !steps.includes(selectedStep)) {
       setSelectedStep(steps[0])
+    }
+    if (groups.length > 0 && !groups.includes(selectedGroup)) {
+      setSelectedGroup(groups[0])
     }
   }
 
@@ -231,12 +238,30 @@ export default function DataViewer() {
         {selectedPath ? (
           <>
             {activeTab !== 'bev' && (
-              <StepSelector steps={availableSteps} selected={selectedStep} onSelect={setSelectedStep} />
+              <div className="flex items-center gap-4 mb-4">
+                <StepSelector steps={availableSteps} selected={selectedStep} onSelect={setSelectedStep} />
+                {sensorGroups.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-400">Sensor Group:</label>
+                    <select
+                      value={selectedGroup}
+                      onChange={(e) => setSelectedGroup(e.target.value)}
+                      className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm"
+                    >
+                      {sensorGroups.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             )}
-            {activeTab === 'gallery' && <ImageGallery path={selectedPath} step={selectedStep} />}
-            {activeTab === '3d' && (
+            {activeTab === 'gallery' && selectedGroup && (
+              <ImageGallery path={selectedPath} step={selectedStep} sensorGroup={selectedGroup} />
+            )}
+            {activeTab === '3d' && selectedGroup && (
               <Suspense fallback={<p className="text-gray-500">Loading 3D viewer...</p>}>
-                <DataViewer3D path={selectedPath} step={selectedStep} />
+                <DataViewer3D path={selectedPath} step={selectedStep} sensorGroup={selectedGroup} />
               </Suspense>
             )}
             {activeTab === 'bev' && <BevViewer path={selectedPath} />}

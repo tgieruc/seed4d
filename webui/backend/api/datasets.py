@@ -33,11 +33,18 @@ def list_datasets():
                     if not spawn_dir.is_dir():
                         continue
                     steps = sorted([d.name for d in spawn_dir.iterdir() if d.is_dir() and d.name.startswith("step_")])
+                    # Discover sensor groups from the first step's ego_vehicle dir
+                    sensor_groups: list[str] = []
+                    if steps:
+                        ego_dir = spawn_dir / steps[0] / "ego_vehicle"
+                        if ego_dir.is_dir():
+                            sensor_groups = sorted(d.name for d in ego_dir.iterdir() if d.is_dir())
                     vehicle_node["children"].append(
                         {
                             "name": spawn_dir.name,
                             "type": "spawn_point",
                             "steps": steps,
+                            "sensor_groups": sensor_groups,
                             "path": str(spawn_dir.relative_to(DATA_DIR)),
                         }
                     )

@@ -8,16 +8,29 @@ import { getTransforms } from '../api'
 const FRUSTUM_LENGTH = 0.8
 const FRUSTUM_COLORS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#06b6d4', '#ec4899']
 
+// Basis change from SEED4D NeRF world coords to Three.js (Y-up).
+// SEED4D's carla_to_nerf maps: nerf_x = -carla_z, nerf_y = carla_x, nerf_z = carla_y
+// Three.js needs: three_x = right (carla_y), three_y = up (carla_z), three_z = -forward (-carla_x)
+// So: three_x = nerf_z, three_y = -nerf_x, three_z = -nerf_y
+const NERF_TO_THREE = new THREE.Matrix4().set(
+  0, 0, 1, 0,
+  -1, 0, 0, 0,
+  0, -1, 0, 0,
+  0, 0, 0, 1,
+)
+
 function CameraFrustum({ matrix, color, fov }: { matrix: number[][]; color: string; fov?: number }) {
   const { position, quaternion, geometry } = useMemo(() => {
-    const mat = new THREE.Matrix4()
-    // Three.js Matrix4.set() takes row-major order
-    mat.set(
+    const nerfMat = new THREE.Matrix4()
+    nerfMat.set(
       matrix[0][0], matrix[0][1], matrix[0][2], matrix[0][3],
       matrix[1][0], matrix[1][1], matrix[1][2], matrix[1][3],
       matrix[2][0], matrix[2][1], matrix[2][2], matrix[2][3],
       matrix[3][0], matrix[3][1], matrix[3][2], matrix[3][3],
     )
+
+    // Convert from NeRF world to Three.js world
+    const mat = NERF_TO_THREE.clone().multiply(nerfMat)
 
     const pos = new THREE.Vector3()
     const quat = new THREE.Quaternion()
@@ -62,24 +75,26 @@ function CameraFrustum({ matrix, color, fov }: { matrix: number[][]; color: stri
   )
 }
 
-function TransformFrustums({ path, step }: { path: string; step: string }) {
+function TransformFrustums({ path, step, sensorGroup }: { path: string; step: string; sensorGroup: string }) {
+  const basePath = `${path}/${step}/ego_vehicle/${sensorGroup}`
   const { data, isLoading } = useQuery({
-    queryKey: ['transforms-3d', path, step],
-    queryFn: () => getTransforms(`${path}/${step}/ego_vehicle/nuscenes`),
+    queryKey: ['transforms-3d', basePath],
+    queryFn: () => getTransforms(basePath),
   })
 
   const { frames, centroid } = useMemo(() => {
     const rawFrames = ((data as any)?.frames || []) as any[]
     if (rawFrames.length === 0) return { frames: rawFrames, centroid: new THREE.Vector3() }
 
-    // Compute centroid of all camera positions to center the scene
+    // Compute centroid in Three.js coords (after basis change)
     const center = new THREE.Vector3()
     for (const frame of rawFrames) {
       const m = frame.transform_matrix
       if (!m || m.length < 4) continue
-      center.x += m[0][3]
-      center.y += m[1][3]
-      center.z += m[2][3]
+      // Apply nerf→three: three_x = nerf_z, three_y = -nerf_x, three_z = -nerf_y
+      center.x += m[2][3]
+      center.y += -m[0][3]
+      center.z += -m[1][3]
     }
     center.divideScalar(rawFrames.length)
 
@@ -115,7 +130,7 @@ function EgoVehicle() {
   )
 }
 
-export default function DataViewer3D({ path, step }: { path: string; step: string }) {
+export default function DataViewer3D({ path, step, sensorGroup }: { path: string; step: string; sensorGroup: string }) {
   return (
     <div className="h-[600px] border border-gray-700 rounded-lg overflow-hidden">
       <Canvas camera={{ position: [5, 4, 5], fov: 50 }}>
@@ -124,7 +139,7 @@ export default function DataViewer3D({ path, step }: { path: string; step: strin
         <gridHelper args={[20, 20, '#1e293b', '#334155']} />
         <axesHelper args={[2]} />
         <EgoVehicle />
-        <TransformFrustums path={path} step={step} />
+        <TransformFrustums path={path} step={step} sensorGroup={sensorGroup} />
         <OrbitControls />
       </Canvas>
     </div>

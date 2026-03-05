@@ -38,5 +38,6 @@ export interface DatasetNode {
   type: 'map' | 'weather' | 'vehicle' | 'spawn_point'
   children?: DatasetNode[]
   steps?: string[]
+  sensor_groups?: string[]
   path?: string
 }
