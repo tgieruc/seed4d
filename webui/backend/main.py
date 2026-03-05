@@ -10,6 +10,7 @@ from webui.backend.api.jobs import router as jobs_router
 from webui.backend.api.references import router as references_router
 from webui.backend.database import Base, SessionLocal, engine
 from webui.backend.models import JobRecord
+from webui.backend.services.job_runner import cleanup_stale_configs, mark_active_jobs_failed
 
 Base.metadata.create_all(bind=engine)
 
@@ -25,8 +26,11 @@ async def lifespan(_app: FastAPI):
         job.completed_at = datetime.now(UTC)
     if orphaned:
         db.commit()
+    cleanup_stale_configs()
     db.close()
     yield
+    # Shutdown: mark any still-running jobs as failed
+    mark_active_jobs_failed()
 
 
 app = FastAPI(title="SEED4D Web UI", version="0.1.0", lifespan=lifespan)

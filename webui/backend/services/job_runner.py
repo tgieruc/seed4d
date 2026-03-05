@@ -4,7 +4,6 @@ import logging
 import os
 import signal
 import subprocess
-import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -19,6 +18,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 # In-memory store for active WebSocket connections per job
 _job_subscribers: dict[str, list[asyncio.Queue]] = {}
+
+# Track running job IDs so we can clean up on shutdown
+_active_job_ids: set[str] = set()
 
 
 def subscribe(job_id: str) -> asyncio.Queue:
@@ -86,17 +88,19 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         if not job:
             return
 
-        # Write YAML to temp file inside config/ (mounted into Docker at /seed4d/config/)
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, dir=str(PROJECT_ROOT / "config")) as f:
-            f.write(yaml_content)
-            config_path = f.name
+        # Write YAML to a stable file based on job ID (mounted into Docker at /seed4d/config/)
+        loop = asyncio.get_running_loop()
+        config_path = str(PROJECT_ROOT / "config" / f"_job_{job_id}.yaml")
+        Path(config_path).write_text(yaml_content)
 
         job.status = "running"
         job.started_at = datetime.now(UTC)
         db.commit()
+        _active_job_ids.add(job_id)
         await _broadcast(job_id, {"type": "status", "status": "running"})
 
-        container = _detect_docker_container()
+        # Run Docker detection in a thread to avoid blocking the event loop
+        container = await loop.run_in_executor(None, _detect_docker_container)
         logger.info("Job %s: container=%s", job_id, container)
 
         if container:
@@ -107,8 +111,11 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
             cmd = [
                 "docker",
                 "exec",
+                "-e",
+                "PYTHONUNBUFFERED=1",
                 container,
                 "python3",
+                "-u",
                 "/seed4d/generator.py",
                 "--config",
                 container_config,
@@ -121,6 +128,7 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
             logger.warning("No Docker container found — running generator.py on host")
             cmd = [
                 "python3",
+                "-u",
                 str(PROJECT_ROOT / "generator.py"),
                 "--config",
                 config_path,
@@ -128,26 +136,25 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
                 str(PROJECT_ROOT / data_dir),
             ]
 
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
             cwd=str(PROJECT_ROOT),
         )
         job.pid = process.pid
         db.commit()
 
         log_lines: list[str] = []
-        loop = asyncio.get_running_loop()
         while True:
-            line = await loop.run_in_executor(None, process.stdout.readline)
-            if not line and process.poll() is not None:
+            line_bytes = await process.stdout.readline()
+            if not line_bytes:
                 break
-            if line:
-                log_lines.append(line)
-                await _broadcast(job_id, {"type": "log", "line": line.rstrip()})
+            line = line_bytes.decode(errors="replace")
+            log_lines.append(line)
+            await _broadcast(job_id, {"type": "log", "line": line.rstrip()})
 
+        await process.wait()
         job.log = "".join(log_lines)
         job.pid = None
 
@@ -173,11 +180,37 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
             db.commit()
         await _broadcast(job_id, {"type": "status", "status": "failed", "error": str(e)})
     finally:
-        # Clean up temp config
-        if config_path:
+        _active_job_ids.discard(job_id)
+        # Clean up config file only when job finished (not on server reload)
+        if config_path and job and job.status in ("completed", "failed", "cancelled"):
             with contextlib.suppress(OSError):
                 os.unlink(config_path)
         db.close()
+
+
+def mark_active_jobs_failed():
+    """Mark any in-memory active jobs as failed. Called on shutdown."""
+    if not _active_job_ids:
+        return
+    db = SessionLocal()
+    for jid in list(_active_job_ids):
+        job = db.get(JobRecord, jid)
+        if job and job.status == "running":
+            job.status = "failed"
+            job.error = "Server restarted — job was interrupted. Please re-run."
+            job.completed_at = datetime.now(UTC)
+            job.pid = None
+    db.commit()
+    db.close()
+    _active_job_ids.clear()
+
+
+def cleanup_stale_configs():
+    """Remove leftover _job_*.yaml config files from completed/failed jobs."""
+    config_dir = PROJECT_ROOT / "config"
+    for f in config_dir.glob("_job_*.yaml"):
+        with contextlib.suppress(OSError):
+            f.unlink()
 
 
 def cancel_job(job_id: str, db: Session):
