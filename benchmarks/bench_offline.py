@@ -387,14 +387,17 @@ def test_config_loading():
         print("  Skipped — nuscenes.yaml not found")
         return
 
-    from common.config import load_scenario_config
+    import yaml
 
     def load_once():
-        return load_scenario_config(config_path)
+        with open(config_path) as f:
+            return yaml.safe_load(f)
 
     def load_twice():
-        load_scenario_config(config_path)
-        load_scenario_config(config_path)
+        with open(config_path) as f:
+            yaml.safe_load(f)
+        with open(config_path) as f:
+            yaml.safe_load(f)
 
     mean1, mn1, mx1 = _timer(load_once, n_iter=20)
     mean2, mn2, mx2 = _timer(load_twice, n_iter=20)

@@ -1,3 +1,6 @@
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,11 +8,28 @@ from webui.backend.api.configs import router as configs_router
 from webui.backend.api.datasets import router as datasets_router
 from webui.backend.api.jobs import router as jobs_router
 from webui.backend.api.references import router as references_router
-from webui.backend.database import Base, engine
+from webui.backend.database import Base, SessionLocal, engine
+from webui.backend.models import JobRecord
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="SEED4D Web UI", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # On startup: mark orphaned running/queued jobs as failed
+    db = SessionLocal()
+    orphaned = db.query(JobRecord).filter(JobRecord.status.in_(["queued", "running"])).all()
+    for job in orphaned:
+        job.status = "failed"
+        job.error = "Server restarted — job was interrupted. Please re-run."
+        job.completed_at = datetime.now(UTC)
+    if orphaned:
+        db.commit()
+    db.close()
+    yield
+
+
+app = FastAPI(title="SEED4D Web UI", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

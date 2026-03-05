@@ -21,7 +21,6 @@ from tqdm import tqdm
 import common.generate_traffic as generate_traffic
 import common.pose as pose
 import common.sensor as sensor
-from common.config import load_scenario_config
 from common.vehicle import Vehicle
 
 
@@ -662,7 +661,8 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     try:
-        config = load_scenario_config(args.config)
+        with open(args.config) as f:
+            config = yaml.safe_load(f)
 
         # Allow overriding CARLA port via environment (for parallel execution)
         carla_port = os.environ.get("CARLA_PORT")

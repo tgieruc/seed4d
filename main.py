@@ -8,18 +8,17 @@ import logging
 import os
 import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
 
 import psutil
 import yaml
 from tqdm import tqdm
 
-from common.config import load_scenario_config
-
 logger = logging.getLogger(__name__)
 
 
 def data_exists(config_path, data_dir):
-    config = load_scenario_config(config_path)
+    config = yaml.safe_load(Path(config_path).read_text())
 
     return os.path.exists(
         os.path.join(
@@ -63,7 +62,7 @@ def _run_single_config(config_path, args, carla_port=2000):
         return (config_path, False)
 
     # Load config once for post-processing paths
-    config = load_scenario_config(config_path)
+    config = yaml.safe_load(Path(config_path).read_text())
     save_path = os.path.join(
         args.data_dir,
         config["map"],

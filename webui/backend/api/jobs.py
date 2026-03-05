@@ -60,7 +60,7 @@ def _to_response(job: JobRecord) -> JobResponse:
 
 
 @router.post("/api/jobs", response_model=JobResponse, status_code=201)
-def submit_job(body: JobCreate, db: Session = Depends(get_db)):
+async def submit_job(body: JobCreate, db: Session = Depends(get_db)):
     config = db.get(ConfigRecord, body.config_id)
     if not config:
         raise HTTPException(status_code=404, detail="Config not found")
@@ -69,7 +69,7 @@ def submit_job(body: JobCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(job)
 
-    # Launch job in background (only when running with async server, not in tests)
+    # Launch job in background
     _schedule_job(job.id, config.yaml_content)
 
     return _to_response(job)
@@ -99,7 +99,7 @@ def cancel(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/api/jobs/{job_id}/rerun", response_model=JobResponse, status_code=201)
-def rerun_job(job_id: str, db: Session = Depends(get_db)):
+async def rerun_job(job_id: str, db: Session = Depends(get_db)):
     old_job = db.get(JobRecord, job_id)
     if not old_job:
         raise HTTPException(status_code=404, detail="Job not found")

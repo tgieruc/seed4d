@@ -16,7 +16,6 @@ import numpy as np
 from PIL import Image
 
 import common.pose as pose
-from common.config import load_camera_config, load_lidar_config
 
 
 class Sensor:
@@ -283,13 +282,15 @@ class SensorManager:
 
         if transform_file_cams:
             if isinstance(transform_file_cams, str):
-                self.spawn_transforms_cams = load_camera_config(transform_file_cams)
+                with open(transform_file_cams) as f:
+                    self.spawn_transforms_cams = json.load(f)
             else:
                 self.spawn_transforms_cams = transform_file_cams
 
         if transform_file_lidar:
             if isinstance(transform_file_lidar, str):
-                self.spawn_transforms_lidar = load_lidar_config(transform_file_lidar)
+                with open(transform_file_lidar) as f:
+                    self.spawn_transforms_lidar = json.load(f)
             else:
                 self.spawn_transforms_lidar = transform_file_lidar
 
