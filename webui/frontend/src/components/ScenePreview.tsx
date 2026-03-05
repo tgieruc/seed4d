@@ -8,10 +8,27 @@ import { listCameraRigs } from '../api'
 
 function CarModel() {
   return (
-    <mesh position={[0, 0.75, 0]}>
-      <boxGeometry args={[2.0, 1.5, 4.5]} />
-      <meshStandardMaterial color="#3b82f6" transparent opacity={0.6} />
-    </mesh>
+    <group>
+      {/* Solid body with low opacity */}
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[1.8, 1.0, 4.2]} />
+        <meshStandardMaterial color="#3b82f6" transparent opacity={0.15} />
+      </mesh>
+      {/* Wireframe outline */}
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[1.8, 1.0, 4.2]} />
+        <meshStandardMaterial color="#3b82f6" wireframe transparent opacity={0.5} />
+      </mesh>
+      {/* Cabin */}
+      <mesh position={[0, 1.15, -0.2]}>
+        <boxGeometry args={[1.6, 0.7, 2.2]} />
+        <meshStandardMaterial color="#3b82f6" transparent opacity={0.1} />
+      </mesh>
+      <mesh position={[0, 1.15, -0.2]}>
+        <boxGeometry args={[1.6, 0.7, 2.2]} />
+        <meshStandardMaterial color="#3b82f6" wireframe transparent opacity={0.3} />
+      </mesh>
+    </group>
   )
 }
 
@@ -24,18 +41,20 @@ interface CameraFrustumProps {
 }
 
 function CameraFrustum({ position, pitch, yaw, fov, color }: CameraFrustumProps) {
-  const length = 1.5
+  // Frustum length scaled to be visually readable
+  const length = 0.6
   const halfFov = (fov * Math.PI) / 360
   const halfW = Math.tan(halfFov) * length
-  const halfH = halfW * 0.75
+  const halfH = halfW * 0.5625 // 16:9 aspect
 
   const geometry = useMemo(() => {
+    // Frustum points along local -Z (Three.js camera convention: looks down -Z)
     const points = [
       new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(-halfW, -halfH, length),
-      new THREE.Vector3(halfW, -halfH, length),
-      new THREE.Vector3(halfW, halfH, length),
-      new THREE.Vector3(-halfW, halfH, length),
+      new THREE.Vector3(-halfW, -halfH, -length),
+      new THREE.Vector3(halfW, -halfH, -length),
+      new THREE.Vector3(halfW, halfH, -length),
+      new THREE.Vector3(-halfW, halfH, -length),
     ]
 
     const edges: [number, number][] = [
@@ -51,13 +70,23 @@ function CameraFrustum({ position, pitch, yaw, fov, color }: CameraFrustumProps)
     return new THREE.BufferGeometry().setFromPoints(linePoints)
   }, [halfW, halfH, length])
 
+  // Camera config angles are in radians.
+  // CARLA applies: yaw_deg = -(yaw_rad * 180/π + 90), pitch_deg = -pitch_rad * 180/π
+  // CARLA coords: x=forward, y=right, z=up → Three.js: carla_y→x, carla_z→y, carla_x→-z
+  // Three.js frustum looks down -Z. CARLA yaw=0° = Three.js -Z = no rotation.
+  // Mapping: three_yaw = -(yaw_rad + π/2), three_pitch = pitch_rad
+  const rotation = useMemo(() => {
+    const threeYaw = -(yaw + Math.PI / 2)
+    return new THREE.Euler(pitch, threeYaw, 0, 'YXZ')
+  }, [pitch, yaw])
+
   return (
-    <group position={position} rotation={[pitch, yaw, 0]}>
+    <group position={position} rotation={rotation}>
       <lineSegments geometry={geometry}>
         <lineBasicMaterial color={color} />
       </lineSegments>
-      <mesh position={[0, 0, 0.1]}>
-        <sphereGeometry args={[0.08, 8, 8]} />
+      <mesh>
+        <sphereGeometry args={[0.06, 8, 8]} />
         <meshStandardMaterial color={color} />
       </mesh>
     </group>
@@ -77,16 +106,21 @@ function CameraRigDisplay() {
       {datasets.map((ds, di) => {
         const rig = rigs.find((r) => ds.camera_rig_file.includes(r.file))
         if (!rig) return null
-        return rig.content.coordinates.map((coord, ci) => (
-          <CameraFrustum
-            key={`${di}-${ci}`}
-            position={[coord[0], coord[2], coord[1]]}
-            pitch={rig.content.pitchs[ci]}
-            yaw={rig.content.yaws[ci]}
-            fov={rig.content.fov?.[ci] ?? ds.fov}
-            color={colors[di % colors.length]}
-          />
-        ))
+        return rig.content.coordinates.map((coord, ci) => {
+          // Camera config coords: [x, y, z] in CARLA (x=forward, y=right, z=up)
+          // Three.js: x=right, y=up, z=backward
+          const threePos: [number, number, number] = [coord[1], coord[2], -coord[0]]
+          return (
+            <CameraFrustum
+              key={`${di}-${ci}`}
+              position={threePos}
+              pitch={rig.content.pitchs[ci]}
+              yaw={rig.content.yaws[ci]}
+              fov={rig.content.fov?.[ci] ?? ds.fov}
+              color={colors[di % colors.length]}
+            />
+          )
+        })
       })}
     </>
   )
@@ -94,22 +128,22 @@ function CameraRigDisplay() {
 
 export default function ScenePreview() {
   return (
-    <Canvas camera={{ position: [8, 6, 8], fov: 50 }}>
+    <Canvas camera={{ position: [6, 4, 6], fov: 50 }}>
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <Grid
-        args={[50, 50]}
+        args={[20, 20]}
         cellSize={1}
         cellColor="#1e293b"
         sectionSize={5}
         sectionColor="#334155"
-        fadeDistance={50}
+        fadeDistance={25}
         position={[0, 0, 0]}
       />
       <CarModel />
       <CameraRigDisplay />
       <OrbitControls />
-      <axesHelper args={[3]} />
+      <axesHelper args={[2]} />
     </Canvas>
   )
 }
