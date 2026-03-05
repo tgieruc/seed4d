@@ -41,9 +41,9 @@ cd /seed4d/
 Run the following command to generate the required config files:
 
 ```
-python3.8 config/cloner.py --yaml_file config/static.yaml --output_dir /seed4d/config/static --type static
+python3 config/cloner.py --yaml_file config/static.yaml --output_dir /seed4d/config/static --type static
 
-python3.8 config/cloner.py --yaml_file config/static.yaml --output_dir /seed4d/config/dynamic --type dynamic
+python3 config/cloner.py --yaml_file config/static.yaml --output_dir /seed4d/config/dynamic --type dynamic
 ```
 This function simpliy clones the configuration files for the different towns. The `--type` flag can be set to `static`, `dynamic` or `custom` depending on the type of data you want to generate. The `--yaml_file` flag should point to the yaml file containing the configuration that should be cloned. The `--output_dir` flag should point to the directory where the config files will be saved. The number of .yaml files required for the static data is 2002 and 498 for the dynamic data.
 
@@ -60,9 +60,9 @@ Now we are ready to generate the data! We recommend generating the data in a [tm
 ```
 tmux 
 
-python3.8 main.py --config_dir /seed4d/config/static/TownX  --carla_executable /home/carla/CarlaUE4.sh --data_dir /seed4d/data/static --normalize_coords False --combine_transforms False --map False
+python3 main.py --config_dir /seed4d/config/static/TownX  --carla_executable /workspace/CarlaUE4.sh --data_dir /seed4d/data/static --normalize_coords False --combine_transforms False --map False
 
-python3.8 main.py --config_dir /seed4d/config/dynamic/TownX  --carla_executable /home/carla/CarlaUE4.sh --data_dir  /seed4d/data/dynamic
+python3 main.py --config_dir /seed4d/config/dynamic/TownX  --carla_executable /workspace/CarlaUE4.sh --data_dir  /seed4d/data/dynamic
 ```
 
 ## Step 5 - Check the generated files
@@ -70,7 +70,7 @@ python3.8 main.py --config_dir /seed4d/config/dynamic/TownX  --carla_executable 
 Once the data is generated one can run (either with the `static` or `dynamic` category): 
 
 ```
-python3.8 utils/check_dataset.py --data_dir /seed4d/data/static --category static
+python3 utils/check_dataset.py --data_dir /seed4d/data/static --category static
 ```
 
 When running this for the dynamic dataset potentially detach the session (e.g., via using tmux) since it can take a lot of time.
@@ -80,7 +80,7 @@ When running this for the dynamic dataset potentially detach the session (e.g., 
 If you want to generate the missing files, run the following (example) command (similar to above) for the missing or incomplete .yaml files:
 
 ```
-python3.8 main.py --config /seed4d/config/static/Town07/static_Town07_Spawnpoint101.yaml  --carla_executable /home/carla/CarlaUE4.sh --data_dir /seed4d/data/static --normalize_coords False --combine_transforms False --map False
+python3 main.py --config /seed4d/config/static/Town07/static_Town07_Spawnpoint101.yaml  --carla_executable /workspace/CarlaUE4.sh --data_dir /seed4d/data/static --normalize_coords False --combine_transforms False --map False
 ```
 
 In the example spawnpoint 1 from Town07 is missing. Here a single yaml config file is provided together with the `--output_dir` flag pointing to the parent directory where the missing files should be saved. The `--config` flag should point to the yaml file containing the configuration that should be created. The utils folder contains a file with which the data can be split into train and test.

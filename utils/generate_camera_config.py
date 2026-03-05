@@ -7,8 +7,9 @@ import argparse
 import codecs
 import json
 import os
-import numpy as np
 import sys
+
+import numpy as np
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -33,7 +34,7 @@ def main(args):
     elif args.type == "nuscenes":
         config = pose.generate_nuscenes_transforms()
     else:
-        raise ValueError("Unsupported camera type: {}".format(args.type))
+        raise ValueError(f"Unsupported camera type: {args.type}")
 
     for key, value in config.items():
         if isinstance(value, np.ndarray):
@@ -41,18 +42,19 @@ def main(args):
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
 
-    json.dump(
-        config,
-        codecs.open(args.output, "w", encoding="utf-8"),
-        separators=(",", ":"),
-        sort_keys=True,
-        indent=4,
-        cls=NumpyEncoder,
-    )
+    with codecs.open(args.output, "w", encoding="utf-8") as f:
+        json.dump(
+            config,
+            f,
+            separators=(",", ":"),
+            sort_keys=True,
+            indent=4,
+            cls=NumpyEncoder,
+        )
     # with open(args.output, "w") as f:
     #     json.dump(config, f, indent=4)
 
-    print("Wrote camera config to {}".format(args.output))
+    print(f"Wrote camera config to {args.output}")
 
 
 if __name__ == "__main__":

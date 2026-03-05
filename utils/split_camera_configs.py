@@ -3,9 +3,10 @@
 # @author: Marius Kästingschäfer and Théo Gieruc
 # ==============================================================================
 
-import json
 import argparse
+import json
 import os
+
 
 def get_elements_n_to_m(data, n, m):
     result = {}
@@ -26,12 +27,12 @@ def save_split_data(split_data, iteration, name):
 def main(json_file_path):
     # Load the JSON data
     name = os.path.basename(os.path.splitext(json_file_path)[0])
-    with open(json_file_path, "r") as file:
+    with open(json_file_path) as file:
         data = json.load(file)
 
     split_into = 25
 
-    for key, value in data.items():
+    for _key, value in data.items():
         total_elements = len(value)
     N_per_split = total_elements // split_into
 
@@ -42,9 +43,7 @@ def main(json_file_path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Split JSON data into 10 smaller files"
-    )
+    parser = argparse.ArgumentParser(description="Split JSON data into 10 smaller files")
     parser.add_argument("--json_file", type=str, help="Path to the JSON file")
 
     args = parser.parse_args()

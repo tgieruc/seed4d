@@ -26,7 +26,7 @@ dataset:
       - sensor.camera.instance_segmentation
       - sensor.camera.depth
       # - sensor.lidar.ray_cast
-    transform_file_cams: config/camera_configs/nuscenes_adjusted.json
+    transform_file_cams: camera/nuscenes/nuscenes_adjusted.json
     # transform_file_lidar: config/lidar_configs/nuscenes_lidar.json
   # sphere:
   #   attached_to_vehicle: true
@@ -74,4 +74,4 @@ traffic_vehicles:
         - sensor.camera.instance_segmentation
         - sensor.camera.optical_flow
         - sensor.camera.depth
-      transform_file_cams: config/camera_configs/nuscenes_adjusted.json
+      transform_file_cams: camera/nuscenes/nuscenes_adjusted.json

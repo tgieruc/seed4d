@@ -4,15 +4,15 @@
 # ==============================================================================
 
 import os
+
 import numpy as np
 from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from PIL import Image
+
 import common.pose as pose
 
 
-def plot_points_angles_3D(
-    points: list, pitchs: list, yaws: list, folder_name, radius=1, letters=5
-):
+def plot_points_angles_3D(points: list, pitchs: list, yaws: list, folder_name, radius=1, letters=5):
     """
     Generate a 3D plot of the given points and their corresponding pitch and yaw angles, with an optional radius and axis labels.
 
@@ -68,7 +68,7 @@ def plot_points_angles_3D(
                 [z[i], z[i] - scaler * np.sin(0)],
                 "g",
             )
-        ax.text(x[i], y[i], z[i], "%s" % (str(i)), size=letters, color="k")
+        ax.text(x[i], y[i], z[i], f"{i!s}", size=letters, color="k")
 
     ax.scatter(x, y, z)
     ax.set_xlabel("x")
@@ -82,7 +82,6 @@ def plot_points_angles_3D(
 
 def gif_maker(SENSORS, TIMESTEPS, folder_name):
     for sensor_type in SENSORS:
-
         fig = plt.figure(figsize=(16, 13))
         columns = 3
         rows = 3
@@ -94,42 +93,27 @@ def gif_maker(SENSORS, TIMESTEPS, folder_name):
         for i in range(TIMESTEPS):
             for j in range(1, columns * rows + 1):
                 ax.append(fig.add_subplot(rows, columns, j))
-                string = (
-                    folder_name
-                    + "/"
-                    + sensor_type
-                    + "/timestep"
-                    + str(i)
-                    + "_cam"
-                    + str(j)
-                    + ".png"
-                )
+                string = folder_name + "/" + sensor_type + "/timestep" + str(i) + "_cam" + str(j) + ".png"
                 img = np.asarray(Image.open(string))
                 ax[-1].set_axis_off()
                 fig.suptitle("CARLA", fontsize=20)
                 plt.imshow(img)
-            plt.subplots_adjust(
-                left=0.1, bottom=0.1, right=1, top=1.2, wspace=0.01, hspace=-0.73
-            )
-            plt.savefig(
-                folder_name + "/gifs/" + sensor_type + "/timestep" + str(i) + ".png"
-            )
+            plt.subplots_adjust(left=0.1, bottom=0.1, right=1, top=1.2, wspace=0.01, hspace=-0.73)
+            plt.savefig(folder_name + "/gifs/" + sensor_type + "/timestep" + str(i) + ".png")
         plt.show()
 
 
 def plot_projection_matrices(nerf_matrices, title, folder_name):
-
     # plot camera position and orientation
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
     for idx, projection_matrix in enumerate(nerf_matrices):
-
         # decompose projection matrix into rotation, translation, and scale
         camera_matrix = np.asarray(projection_matrix)
         rotation_matrix = camera_matrix[:3, :3]
         translation_vector = camera_matrix[:3, 3]
-        scale_vector = np.sqrt(np.sum(rotation_matrix**2, axis=0))
+        np.sqrt(np.sum(rotation_matrix**2, axis=0))
 
         # plot camera position as a red dot
         x, y, z = translation_vector
@@ -139,7 +123,7 @@ def plot_projection_matrices(nerf_matrices, title, folder_name):
         viewing_direction = np.dot(rotation_matrix, np.array([0, 0, 1]))
         ax.quiver(x, y, z, *-viewing_direction, length=1, color="k")
 
-        ax.text(x, y, z, "%s" % (str(idx)), size=10, color="k")
+        ax.text(x, y, z, f"{idx!s}", size=10, color="k")
 
     # ax.scatter(0, 0, 0, c='b', marker='o')
     ax.set_xlabel("X")
@@ -151,19 +135,12 @@ def plot_projection_matrices(nerf_matrices, title, folder_name):
     # plt.show()
 
 
-def plot_both_projection_matrices(
-    coordinates, pitchs, yaws, origin, RADIUS, folder_name
-):
-
+def plot_both_projection_matrices(coordinates, pitchs, yaws, origin, RADIUS, folder_name):
     # unnormalized
-    nerf_matrices_unnormalized = pose.get_OpenGL_matrices_unnormalized(
-        coordinates, pitchs, yaws, origin, RADIUS
-    )
+    nerf_matrices_unnormalized = pose.get_OpenGL_matrices_unnormalized(coordinates, pitchs, yaws, origin, RADIUS)
     title = "/OpenGL_poses_unnormalized"
     plot_projection_matrices(nerf_matrices_unnormalized, title, folder_name)
     # normalized
-    nerf_matrices_normalized = pose.get_OpenGL_matrices_normalized(
-        coordinates, pitchs, yaws, origin, RADIUS
-    )
+    nerf_matrices_normalized = pose.get_OpenGL_matrices_normalized(coordinates, pitchs, yaws, origin, RADIUS)
     title = "/OpenGL_poses_normalized"
     plot_projection_matrices(nerf_matrices_normalized, title, folder_name)

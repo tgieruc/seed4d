@@ -7,13 +7,13 @@
 Create a random config file (with random town, spawnpoint, weather, ego vehicle)
 """
 
-import random
-import yaml
 import argparse
+import random
+
+import yaml
 
 
 def get_random_paramter():
-
     towns = ["Town01", "Town02", "Town03", "Town04", "Town05"]
     towns_N_spawnpoints = [255, 101, 265, 372, 302]
     weathers = [
@@ -86,7 +86,6 @@ def get_random_paramter():
 
 
 def generate_config(file_path):
-
     TOWN, SPAWNPOINT, WEATHER, VEHICLE = get_random_paramter()
 
     config = {
@@ -155,22 +154,20 @@ def generate_config(file_path):
 
 
 def load_yaml_file(file_path):
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         data = yaml.safe_load(file)
     return data
 
 
 def main(args):
-    for i in range(args.number):
+    for _i in range(args.number):
         config_path = generate_config(args.data_dir)
         if args.output:
             print(config_path)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Execute to generate random config(s)."
-    )
+    parser = argparse.ArgumentParser(description="Execute to generate random config(s).")
     parser.add_argument(
         "--data_dir",
         type=str,

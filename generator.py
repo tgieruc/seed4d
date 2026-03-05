@@ -4,27 +4,24 @@
 # ==============================================================================
 
 import argparse
+import json
 import logging
 import os
+import random
 import subprocess
-import json
+import sys
+from contextlib import contextmanager
 from time import sleep
-from typing import Dict
 
 import carla
 import numpy as np
-import pandas as pd
 import yaml
-from PIL import Image
 from tqdm import tqdm
 
 import common.generate_traffic as generate_traffic
 import common.pose as pose
 import common.sensor as sensor
 from common.vehicle import Vehicle
-from contextlib import contextmanager
-import sys, os
-import random
 
 
 @contextmanager
@@ -61,7 +58,7 @@ class Generator:
         config: dict,
         data_dir: str,
         carla_executable: str,
-        logger: logging.Logger = None,
+        logger: logging.Logger | None = None,
         quiet: bool = False,
     ):
         self.config_path = config_path
@@ -114,40 +111,47 @@ class Generator:
         self.logger.info(" Launching CARLA server ...")
 
         if not os.path.exists(self.carla_executable):
-            self.logger.error(
-                "CARLA executable not found at {}".format(self.carla_executable)
-            )
-            raise Exception(
-                "CARLA executable not found at {}".format(self.carla_executable)
-            )
+            self.logger.error(f"CARLA executable not found at {self.carla_executable}")
+            raise Exception(f"CARLA executable not found at {self.carla_executable}")
 
+        # Pass the target map at startup so CARLA boots directly into it,
+        # avoiding a slow load_world() call during _setup_world().
+        target_map = self.config.get("map", "")
+        map_arg = [f"/Game/Carla/Maps/{target_map}"] if target_map else []
         flags = ["-carla-server", "-RenderOffScreen", "-nosound", "-quality-level=Epic"]
-        command = [self.carla_executable] + flags
-        # potentially add: stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        self.carla_process = subprocess.Popen(command)  
-        # this timer might cause problems - if not starting up increase the value!
-        sleep(15) #previous 15
+        command = [self.carla_executable, *map_arg, *flags]
+        self.carla_process = subprocess.Popen(command)
 
-        while self.carla_process.poll() == None:
+        # Exponential backoff: try connecting starting at 2s, doubling up to 16s
+        # This replaces the old hardcoded sleep(15) + sleep(1) retry loop
+        backoff = 2.0
+        max_backoff = 16.0
+        max_total_wait = 120.0
+        total_waited = 0.0
+
+        while self.carla_process.poll() is None and total_waited < max_total_wait:
+            sleep(backoff)
+            total_waited += backoff
             try:
-                self.client = carla.Client(
-                    self.config["carla"]["host"], self.config["carla"]["port"]
-                )
-                self.client.set_timeout(self.config["carla"]["timeout"])
+                self.client = carla.Client(self.config["carla"]["host"], self.config["carla"]["port"])
+                # Use a short timeout so get_world() fails fast if CARLA isn't ready yet,
+                # letting Python's retry loop handle it instead of blocking for 720s internally.
+                self.client.set_timeout(10.0)
                 self.world = self.client.get_world()
+                # Connected — restore full timeout for world setup and data generation.
+                self.client.set_timeout(self.config["carla"]["timeout"])
                 self._setup_world()
                 self._set_weather()
-                self.logger.info(" Connected to the CARLA server")
+                self.logger.info(f" Connected to the CARLA server after {total_waited:.1f}s")
                 return
-            except Exception as e:
-                # logger.exception("Error occurred while connecting to the CARLA server")
-                sleep(1)
+            except Exception:
+                self.logger.info(f" CARLA not ready after {total_waited:.1f}s, retrying...")
+                backoff = min(backoff * 2, max_backoff)
 
         self.logger.error("CARLA process exited unexpectedly. Could not connect.")
         raise RuntimeError("CARLA process exited unexpectedly. Could not connect.")
 
     def kill_carla(self):
-
         subprocess.call(
             ["killall", "CarlaUE4-Linux-Shipping"],
             stdout=subprocess.DEVNULL,
@@ -168,7 +172,7 @@ class Generator:
 
         self.blueprint_library = self.world.get_blueprint_library()
 
-        if self.world.get_map().name != self.config["map"]:
+        if not self.world.get_map().name.endswith(self.config["map"]):
             self.world = self.client.load_world(self.config["map"])
 
         self.map = self.world.get_map()
@@ -181,7 +185,7 @@ class Generator:
         settings = self.world.get_settings()
         settings.synchronous_mode = self.config["carla"]["synchronous_mode"]
         settings.fixed_delta_seconds = self.config["carla"]["fixed_delta_seconds"]
-        self.world.apply_settings(settings) 
+        self.world.apply_settings(settings)
 
         for actor in self.world.get_actors():
             actor.destroy()
@@ -189,10 +193,7 @@ class Generator:
         if self.config["number_of_vehicles"] > 0:
             self.traffic_manager = self.client.get_trafficmanager(8000)
             self.traffic_manager.set_synchronous_mode(self.config["carla"]["synchronous_mode"])
-            #self.traffic_manager.set_global_distance_to_leading_vehicle(2.5)
-            
-
-        
+            # self.traffic_manager.set_global_distance_to_leading_vehicle(2.5)
 
     def _set_weather(self):
         """
@@ -224,7 +225,7 @@ class Generator:
             spawn_points = []
             for n_spawn_point in self.config["spawn_point"]:
                 # n_spawn_point from 1-N and spawn_points from 0-N
-                spawn_points.append(self.spawn_points[n_spawn_point-1])
+                spawn_points.append(self.spawn_points[n_spawn_point - 1])
             self.spawn_points = spawn_points
 
         else:
@@ -242,18 +243,13 @@ class Generator:
             disable=self.quiet,
         )
 
-        for n_spawnpoint, spawn_point in zip(
-            self.config["spawn_point"], self.spawn_points
-        ):
-
-            self.logger.info(
-                f" Starting data generation for spawn point {n_spawnpoint} of map {self.config['map']}."
-            )
+        for n_spawnpoint, spawn_point in zip(self.config["spawn_point"], self.spawn_points):
+            self.logger.info(f" Starting data generation for spawn point {n_spawnpoint} of map {self.config['map']}.")
 
             # Spawn ego vehicle, traffic vehicles and pedestrians
             ego_blueprint = self.blueprint_library.filter(self.config["vehicle"])[0]
             ego_vehicle = Vehicle(ego_blueprint, spawn_point, self.world, self.traffic_manager, self.logger)
-            
+
             traffic_vehicles = generate_traffic.spawn_cars(
                 self.client,
                 self.world,
@@ -275,25 +271,19 @@ class Generator:
             )
 
             # Disable autopilot for all vehicles
-            
+
             ego_vehicle.set_autopilot(True)
             for vehicle in traffic_vehicles:
                 vehicle.set_autopilot(True)
 
             # Wait for vehicles to touch the ground
             # add random ticks to somewhat randomize starting time (vehicle speed, etc.)
-            if self.config["steps"] == 1:
-                random_offset = 24
-            else:
-                random_offset = random.randint(0, 20)
+            random_offset = 24 if self.config["steps"] == 1 else random.randint(0, 20)
             for _ in range(random_offset):
                 self._tick()
 
-                    
             # Set up sensors
-            ego_vehicle.set_sensors(
-                self.config["dataset"], self.config.get("invisible_ego", False)
-            )
+            ego_vehicle.set_sensors(self.config["dataset"], self.config.get("invisible_ego", False))
             if self.config.get("other_vehicles_have_sensors", False):
                 for vehicle in traffic_vehicles:
                     vehicle.set_sensors(self.config["dataset"], False)
@@ -307,7 +297,6 @@ class Generator:
             timesteps = {}
 
             for step in range(self.config["steps"]):
-
                 self.logger.info(
                     f" Step {step} of {self.config['steps']} for spawn point {n_spawnpoint} of map {self.config['map']}"
                 )
@@ -321,28 +310,14 @@ class Generator:
 
                 actors = self.world.get_actors()
                 sens = [actor for actor in actors if actor.type_id.startswith("sensor")]
+                vehicles = [actor for actor in actors if actor.type_id.startswith("vehicle")]
                 self.logger.info(
                     " Amount actors: %d, Amount sensors: %d, Amount vehicles: %d",
                     len(actors),
                     len(sens),
-                    len(self.world.get_actors().filter("vehicle.*")),
+                    len(vehicles),
                 )
 
-                # Reset sensors before capturing data
-                ego_vehicle.reset_sensors()
-                if self.config.get("other_vehicles_have_sensors", False):
-                    for vehicle in traffic_vehicles:
-                        vehicle.reset_sensors()
-
-                # Capture sensor data
-                self._tick()
-
-                timesteps[int(step)] = float(
-                    self.world.get_snapshot().timestamp.elapsed_seconds
-                )
-
-                # Save sensor data
-                self.logger.info("saving data")
                 ego_path = os.path.join(
                     self.data_dir,
                     self.config["map"],
@@ -352,19 +327,36 @@ class Generator:
                     f"step_{step}",
                     "ego_vehicle",
                 )
-                ego_vehicle.save_data(ego_path)
-                if self.config.get("other_vehicles_have_sensors", False):
-                    for vehicle in traffic_vehicles:
-                        path = os.path.join(
-                            self.data_dir,
-                            self.config["map"],
-                            self.config["weather"],
-                            self.config["vehicle"],
-                            f"spawn_point_{n_spawnpoint}",
-                            f"step_{step}",
-                            str(vehicle.id),
-                        )
-                        vehicle.save_data(path)
+
+                invisible_only = self.config.get("invisible_only", False)
+
+                if not invisible_only:
+                    # Reset sensors before capturing data
+                    ego_vehicle.reset_sensors()
+                    if self.config.get("other_vehicles_have_sensors", False):
+                        for vehicle in traffic_vehicles:
+                            vehicle.reset_sensors()
+
+                    # Capture sensor data
+                    self._tick()
+
+                    timesteps[int(step)] = float(self.world.get_snapshot().timestamp.elapsed_seconds)
+
+                    # Save sensor data
+                    self.logger.info("saving data")
+                    ego_vehicle.save_data(ego_path)
+                    if self.config.get("other_vehicles_have_sensors", False):
+                        for vehicle in traffic_vehicles:
+                            path = os.path.join(
+                                self.data_dir,
+                                self.config["map"],
+                                self.config["weather"],
+                                self.config["vehicle"],
+                                f"spawn_point_{n_spawnpoint}",
+                                f"step_{step}",
+                                str(vehicle.id),
+                            )
+                            vehicle.save_data(path)
 
                 # If invisible, save invisible data
                 if self.config.get("invisible_ego", False):
@@ -373,7 +365,12 @@ class Generator:
                         [vehicle.go_down() for vehicle in traffic_vehicles]
                     ego_vehicle.reset_invisible_sensors()
                     self._tick()
-                    ego_vehicle.save_invisible_data(ego_path)
+
+                    if invisible_only:
+                        timesteps[int(step)] = float(self.world.get_snapshot().timestamp.elapsed_seconds)
+
+                    suffix = "" if invisible_only else "_invisible"
+                    ego_vehicle.save_invisible_data(ego_path, suffix=suffix)
                     ego_vehicle.go_up()
                     self._tick()
 
@@ -386,9 +383,7 @@ class Generator:
                     # self._tick()
                     # self._tick()
                     while (
-                        self._birdeye_distance(
-                            ego_vehicle.get_location(), spawn_point.location
-                        )
+                        self._birdeye_distance(ego_vehicle.get_location(), spawn_point.location)
                         < self.config["min_distance"]
                     ):
                         self._tick()
@@ -445,7 +440,7 @@ class Generator:
                     vehicle.destroy()
                 for actors in self.world.get_actors().filter("walker.*"):
                     actors.destroy()
-            except:
+            except Exception:
                 pass
 
             with open(save_path + "/vehicles.json", "w") as file:
@@ -455,7 +450,7 @@ class Generator:
 
     def _dump_config(self, save_path):
         # write original yaml config into folder
-        with open(self.config_path, "r") as f:
+        with open(self.config_path) as f:
             config = yaml.safe_load(f)
 
         with open(save_path + "/config.yaml", "w") as file:
@@ -508,8 +503,8 @@ class Generator:
 
     def _destroy_sensors(
         self,
-        sensor_managers: Dict[str, sensor.SensorManager] = None,
-        traffic_sensor_managers: Dict[str, Dict[str, sensor.SensorManager]] = None,
+        sensor_managers: dict[str, sensor.SensorManager] | None = None,
+        traffic_sensor_managers: dict[str, dict[str, sensor.SensorManager]] | None = None,
     ):
         if sensor_managers is not None:
             for _, sensor_manager in sensor_managers.items():
@@ -519,15 +514,11 @@ class Generator:
                 for _, sensor_manager in traffic_sensor_manager.items():
                     sensor_manager.destroy()
 
-    def _birdeye_distance(
-        self, location1: carla.Location, location2: carla.Location
-    ) -> float:
+    def _birdeye_distance(self, location1: carla.Location, location2: carla.Location) -> float:
         """
         Calculate the Euclidean distance between two locations in the x-y plane.
         """
-        return np.sqrt(
-            (location1.x - location2.x) ** 2 + (location1.y - location2.y) ** 2
-        )
+        return np.sqrt((location1.x - location2.x) ** 2 + (location1.y - location2.y) ** 2)
 
     def _tick(self):
         if self.config["carla"]["synchronous_mode"]:
@@ -541,14 +532,12 @@ class Generator:
         vehicle.set_autopilot(False)
 
         # wait for vehicle to touch the ground
-        for i in range(20):
+        for _i in range(20):
             self._tick()
 
         return vehicle
 
-    def _setup_sensor_managers(
-        self, vehicle: carla.Actor
-    ) -> Dict[str, sensor.SensorManager]:
+    def _setup_sensor_managers(self, vehicle: carla.Actor) -> dict[str, sensor.SensorManager]:
         sensor_managers = {}
 
         for setup_name, sensor_config in self.config["dataset"].items():
@@ -564,9 +553,7 @@ class Generator:
 
         return sensor_managers
 
-    def _setup_temporary_managers(
-        self, vehicle_cam2world: dict
-    ) -> Dict[str, sensor.SensorManager]:
+    def _setup_temporary_managers(self, vehicle_cam2world: dict) -> dict[str, sensor.SensorManager]:
         """
         Run through all vehicle_cam2world and spawn a camera for each (using cam configs from ego-vehicle)
         """
@@ -575,13 +562,10 @@ class Generator:
         # for setup_name, sensor_config in self.config["dataset"].items():
 
         for vehicle_id in self.vehicle_cam2world:
-
             if vehicle_id == "nuscenes":
                 sensor_info = self.config["dataset"]["nuscenes"]["sensor_info"]
             else:
-                sensor_info = self.config["traffic_vehicles"]["dataset"]["nuscenes"][
-                    "sensor_info"
-                ]
+                sensor_info = self.config["traffic_vehicles"]["dataset"]["nuscenes"]["sensor_info"]
 
             sensor_managers[vehicle_id] = dict()
 
@@ -599,26 +583,20 @@ class Generator:
 
         return sensor_managers
 
-    def _setup_traffic_sensor_managers(
-        self, vehicle_id_list: list
-    ) -> Dict[str, sensor.SensorManager]:
+    def _setup_traffic_sensor_managers(self, vehicle_id_list: list) -> dict[str, sensor.SensorManager]:
         sensor_managers = {}
         for vehicle_id in vehicle_id_list:
             vehicle = self.world.get_actor(vehicle_id)
 
             sensor_managers[vehicle_id] = dict()
 
-            for setup_name, sensor_config in self.config["traffic_vehicles"][
-                "dataset"
-            ].items():
+            for setup_name, sensor_config in self.config["traffic_vehicles"]["dataset"].items():
                 sensor_managers[vehicle_id][setup_name] = sensor.SensorManager(
                     world=self.world,
                     blueprint_library=self.blueprint_library,
                     sensor_info=sensor_config["sensor_info"],
                     transform_file_cams=sensor_config["transform_file_cams"],
-                    transform_file_lidar=sensor_config.get(
-                        "transform_file_lidar", None
-                    ),
+                    transform_file_lidar=sensor_config.get("transform_file_lidar", None),
                     vehicle=vehicle,
                     logger=self.logger,
                 )
@@ -627,13 +605,12 @@ class Generator:
 
     def _save_sensor_data(
         self,
-        sensor_managers: Dict[str, sensor.SensorManager],
+        sensor_managers: dict[str, sensor.SensorManager],
         n_spawnpoint: int,
         step: int,
-        traffic_sensor_managers: Dict[str, Dict[str, sensor.SensorManager]] = None,
+        traffic_sensor_managers: dict[str, dict[str, sensor.SensorManager]] | None = None,
         temporary: bool = False,
     ):
-
         save_path = os.path.join(
             # self.config["data_dir"],
             self.data_dir,
@@ -649,7 +626,6 @@ class Generator:
                 sensor_manager.save_data(os.path.join(save_path, setup_name))
 
         if traffic_sensor_managers is not None:
-
             for (
                 traffic_vehicle_id,
                 traffic_sensor_manager,
@@ -665,7 +641,6 @@ class Generator:
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="Generate data for the CARLA dataset")
     parser.add_argument(
         "--config",
@@ -674,9 +649,7 @@ if __name__ == "__main__":
         default="config.yaml",
         help="Path to the config file",
     )
-    parser.add_argument(
-        "--data_dir", type=str, default="data", help="Path to the data directory"
-    )
+    parser.add_argument("--data_dir", type=str, default="data", help="Path to the data directory")
     parser.add_argument(
         "--quiet",
         "-q",
@@ -692,16 +665,34 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Configure logging
-    (
-        logging.basicConfig(level=logging.ERROR)
-        if args.quiet
-        else logging.basicConfig(level=logging.INFO)
-    )
+    (logging.basicConfig(level=logging.ERROR) if args.quiet else logging.basicConfig(level=logging.INFO))
     logger = logging.getLogger(__name__)
 
     try:
-        with open(args.config, "r") as f:
+        with open(args.config) as f:
             config = yaml.safe_load(f)
+
+        # Allow overriding CARLA port via environment (for parallel execution)
+        carla_port = os.environ.get("CARLA_PORT")
+        if carla_port:
+            config["carla"]["port"] = int(carla_port)
+
+        # Resolve relative transform_file paths relative to the config file
+        config_dir = os.path.dirname(os.path.abspath(args.config))
+        for section in ("dataset",):
+            for _setup_name, sensor_config in config.get(section, {}).items():
+                for key in ("transform_file_cams", "transform_file_lidar"):
+                    path = sensor_config.get(key)
+                    if path and not os.path.isabs(path):
+                        sensor_config[key] = os.path.normpath(os.path.join(config_dir, path))
+        # Also handle traffic_vehicles.dataset
+        tv = config.get("traffic_vehicles")
+        for _setup_name, sensor_config in (tv.get("dataset", {}) if tv else {}).items():
+            for key in ("transform_file_cams", "transform_file_lidar"):
+                path = sensor_config.get(key)
+                if path and not os.path.isabs(path):
+                    sensor_config[key] = os.path.normpath(os.path.join(config_dir, path))
+
         with Generator(
             args.config,
             config,
@@ -712,7 +703,7 @@ if __name__ == "__main__":
         ) as generator:
             generator.generate()
 
-    except Exception as e:
+    except Exception:
         logger.exception("An error occurred during data generation")
 
     finally:

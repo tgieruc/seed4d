@@ -16,9 +16,10 @@ Usage:
 import argparse
 import os
 import random
-import yaml
-from utils.generate_random_camera_config import generate_random_camera_config, save_camera_config
 
+import yaml
+
+from utils.generate_random_camera_config import generate_random_camera_config, save_camera_config
 
 # Default sensor setup matching existing nuscenes config
 DEFAULT_SENSOR_INFO = {
@@ -133,8 +134,8 @@ def generate_batch_configs(
         # Generate random camera config
         cam_seed = (seed + i) if seed is not None else None
         cam_config = generate_random_camera_config(
-            num_cameras="random", seed=cam_seed,
-            min_cams=min_cams, max_cams=max_cams)
+            num_cameras="random", seed=cam_seed, min_cams=min_cams, max_cams=max_cams
+        )
 
         n_cams = len(cam_config["coordinates"])
         cam_path = os.path.join(os.path.abspath(camera_dir), f"random_{n_cams}cam_{i:04d}.json")
@@ -162,9 +163,7 @@ def generate_batch_configs(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate batch YAML scenario configs with random cameras"
-    )
+    parser = argparse.ArgumentParser(description="Generate batch YAML scenario configs with random cameras")
     parser.add_argument("--num-configs", type=int, default=10)
     parser.add_argument("--camera-dir", type=str, default="config/camera/random/")
     parser.add_argument("--config-dir", type=str, default="config/random_scenarios/")

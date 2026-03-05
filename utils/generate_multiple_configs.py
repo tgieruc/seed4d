@@ -7,19 +7,19 @@
 Generates configs where vehicle is centered, single timestep and surrounded by cameras
 """
 
-import os
 import argparse
+import os
+
 import yaml
 
 
 def load_yaml_file(file_path):
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         data = yaml.safe_load(file)
     return data
 
 
 def main(args):
-
     cars = [
         "audi.a2",
         "audi.tt",
@@ -63,42 +63,23 @@ def main(args):
         "carlamotors.carlacola",
     ]
 
-    radius_10_vehicles = ["carlamotors.firetruck", "mitsubishi.fusorosa"]
-
-    folder_path_radius_5 = (
-        "/mariustheo/Generator/config/camera_configs/sphere-2500-radius-5"
-    )
+    folder_path_radius_5 = "/mariustheo/Generator/config/camera_configs/sphere-2500-radius-5"
     sphere_file_names_radius_5 = os.listdir(folder_path_radius_5)
-    sphere_paths_radius_5 = [
-        os.path.join(folder_path_radius_5, file) for file in sphere_file_names_radius_5
-    ]
+    sphere_paths_radius_5 = [os.path.join(folder_path_radius_5, file) for file in sphere_file_names_radius_5]
 
-    folder_path_radius_10 = (
-        "/mariustheo/Generator/config/camera_configs/sphere-2500-radius-10"
-    )
+    folder_path_radius_10 = "/mariustheo/Generator/config/camera_configs/sphere-2500-radius-10"
     sphere_file_names_radius_10 = os.listdir(folder_path_radius_10)
-    sphere_paths_radius_10 = [
-        os.path.join(folder_path_radius_10, file)
-        for file in sphere_file_names_radius_10
-    ]
+    sphere_paths_radius_10 = [os.path.join(folder_path_radius_10, file) for file in sphere_file_names_radius_10]
 
     for car in cars:
-        if car in sphere_paths_radius_10:
-            paths = sphere_paths_radius_10
-        else:
-            paths = sphere_paths_radius_5
+        paths = sphere_paths_radius_10 if car in sphere_paths_radius_10 else sphere_paths_radius_5
         for idx, path in enumerate(paths):
             config_file = load_yaml_file(args.read_dir)
             config_file["vehicle"] = "vehicle." + car
             config_file["dataset"]["sphere"]["transform_file"] = path
 
             with open(
-                args.write_dir
-                + "/configs/"
-                + str(car)
-                + "_config_"
-                + str(idx)
-                + ".yaml",
+                args.write_dir + "/configs/" + str(car) + "_config_" + str(idx) + ".yaml",
                 "w",
             ) as file:
                 yaml.dump(config_file, file)

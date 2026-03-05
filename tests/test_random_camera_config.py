@@ -1,7 +1,6 @@
 import json
 import os
 import tempfile
-import pytest
 
 
 def test_generates_valid_json():
@@ -36,6 +35,7 @@ def test_coordinate_bounds():
 def test_angle_bounds():
     """Pitch and yaw are within reasonable ranges."""
     import math
+
     from utils.generate_random_camera_config import generate_random_camera_config
 
     config = generate_random_camera_config(num_cameras=6, seed=42)
@@ -92,7 +92,7 @@ def test_save_to_file():
         save_camera_config(config, f.name)
         f.flush()
 
-        with open(f.name, "r") as rf:
+        with open(f.name) as rf:
             loaded = json.load(rf)
 
         assert loaded == config

@@ -7,10 +7,10 @@
 Mean 0 all coordinates and normalize with largest radius (such that values are centered at 0 and have size -1 to +1)
 """
 
-import os
-import json
 import argparse
-from matplotlib import pyplot as plt
+import json
+import os
+
 import numpy as np
 
 
@@ -23,14 +23,9 @@ def max_radius(values):
 
 
 def main(args):
-
     max_steps = (
         max(
-            (
-                int(item[5:])
-                for item in os.listdir(args.data_dir)
-                if item.startswith("step_")
-            ),
+            (int(item[5:]) for item in os.listdir(args.data_dir) if item.startswith("step_")),
             default=0,
         )
         + 1
@@ -42,30 +37,19 @@ def main(args):
     # elements = elements_mapping.get(args.elements, [])
 
     for step in range(max_steps):
-
         folder_path = args.data_dir + "/step_" + str(step) + "/"
-        elements = [
-            f
-            for f in os.listdir(folder_path)
-            if os.path.isdir(os.path.join(folder_path, f))
-        ]
+        elements = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
 
         for element in elements:
-
             # load jsons
-            if element.isdigit() or element == 'ego_vehicle':
+            if element.isdigit() or element == "ego_vehicle":
                 json_file_path = (
-                    args.data_dir
-                    + "/step_"
-                    + str(step)
-                    + "/"
-                    + element
-                    + "/nuscenes/transforms/transforms.json"
+                    args.data_dir + "/step_" + str(step) + "/" + element + "/nuscenes/transforms/transforms.json"
                 )
             else:
-                print('Unknown element ', element, ' found')
+                print("Unknown element ", element, " found")
 
-            with open(json_file_path, "r") as json_file:
+            with open(json_file_path) as json_file:
                 json_data = json.load(json_file)
 
             # collect all x, y, z values
@@ -91,11 +75,7 @@ def main(args):
     # load all config files and replace relevant values
     max_steps = (
         max(
-            (
-                int(item[5:])
-                for item in os.listdir(args.data_dir)
-                if item.startswith("step_")
-            ),
+            (int(item[5:]) for item in os.listdir(args.data_dir) if item.startswith("step_")),
             default=0,
         )
         + 1
@@ -107,29 +87,15 @@ def main(args):
     ]
 
     for element in all_folders:
-
         for step in range(max_steps):
-
             if element == "nuscenes" or element == "sphere":
-                json_file_path = (
-                    args.data_dir
-                    + "/step_"
-                    + str(step)
-                    + "/"
-                    + element
-                    + "/transforms/transforms.json"
-                )
+                json_file_path = args.data_dir + "/step_" + str(step) + "/" + element + "/transforms/transforms.json"
             else:
                 json_file_path = (
-                    args.data_dir
-                    + "/step_"
-                    + str(step)
-                    + "/"
-                    + element
-                    + "/nuscenes/transforms/transforms.json"
+                    args.data_dir + "/step_" + str(step) + "/" + element + "/nuscenes/transforms/transforms.json"
                 )
 
-            with open(json_file_path, "r") as json_file:
+            with open(json_file_path) as json_file:
                 json_data = json.load(json_file)
 
             for idx in range(len(json_data["frames"])):
@@ -148,9 +114,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Execute to normalize the existing poses."
-    )
+    parser = argparse.ArgumentParser(description="Execute to normalize the existing poses.")
     parser.add_argument(
         "--data_dir",
         type=str,

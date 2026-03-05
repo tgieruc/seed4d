@@ -24,6 +24,46 @@ Our data generator is build on [CARLA](https://github.com/carla-simulator/carla)
 - [Dataset structure](docs/data_structure.md)
 - [Dataset visualization](docs/visualizations.md)
 
+## Web UI
+
+A browser-based interface for configuring and running dataset generation jobs without using the command line.
+
+**Demo:** [https://youtu.be/owa3BLJoix4](https://youtu.be/owa3BLJoix4)
+
+### Prerequisites
+
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- [Node.js](https://nodejs.org/) with npm
+- Docker with GPU support (`nvidia-container-toolkit`)
+- A built `seed4d` Docker image (`docker build -t seed4d .`)
+
+### Running the Web UI
+
+```bash
+./webui/dev.sh
+```
+
+This starts:
+- **Backend** (FastAPI) at `http://localhost:8000`
+- **Frontend** (Vite/React) at `http://localhost:5173`
+- API docs at `http://localhost:8000/docs`
+
+Open `http://localhost:5173` in your browser.
+
+### Pages
+
+**Config Builder** — Visual editor for YAML scenario configs. Set map, weather, vehicle, spawn points, sensor rigs (cameras and LiDAR), and simulation parameters. Includes a 3D preview of the sensor setup. Save configs to the database for reuse.
+
+**Job Monitor** — Submit saved configs as generation jobs, track progress with live log streaming, cancel running jobs, and re-run completed or failed jobs. Jobs run one at a time by default (each in its own Docker container). Failed containers are kept for inspection; successful ones are removed automatically.
+
+**Data Viewer** — Browse generated datasets. Visualize camera images and 3D point clouds from LiDAR, with camera pose overlays and per-sensor-group filtering.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `SEED4D_IMAGE` | `seed4d` | Docker image used for generation jobs |
+
 ## Acknowledgements 
 We thank the creators of NeRFStudio, and the CARLA simulator for generously open-sourcing their code.
 

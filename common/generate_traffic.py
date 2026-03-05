@@ -3,8 +3,10 @@
 # @author: Marius Kästingschäfer and Théo Gieruc
 # ==============================================================================
 
-import carla
 import random
+
+import carla
+
 from common.vehicle import Vehicle
 
 
@@ -19,9 +21,9 @@ def spawn_cars(
     traffic_manager,
     logger,
 ):
-    '''
+    """
     Spawn vehicles in the Carla simulation world.
-    
+
     Parameters:
         client (carla.Client): The Carla client object.
         world (carla.World): The Carla simulation world.
@@ -31,24 +33,24 @@ def spawn_cars(
         large_vehicles (bool): Whether to spawn large vehicles or not.
         sort_spawnpoints (bool): Whether to sort the spawn points according to the distance to the vehicle_transform.
         logger (logging.Logger): The logger object to log messages.
-        
+
     Returns:
         vehicles_list (list): The list of spawned vehicles.
-    '''
-    
+    """
+
     if number_of_vehicles <= 0:
         return []
 
     spawn_points = world.get_map().get_spawn_points()
-    
+
     if sort_spawnpoints:
         # sort the spawn_points according to the distance to the vehicle_transform
-        spawn_points = sorted(
-            spawn_points, key=lambda x: x.location.distance(vehicle_transform.location)
-        )[: number_of_vehicles * 2]
+        spawn_points = sorted(spawn_points, key=lambda x: x.location.distance(vehicle_transform.location))[
+            : number_of_vehicles * 2
+        ]
     else:
         random.shuffle(spawn_points)
-    
+
     vehicles_list = []
     spawn_point_index = 0
     while len(vehicles_list) < number_of_vehicles:
@@ -68,23 +70,7 @@ def spawn_cars(
             "vehicle.ford.ambulance",
             "vehicle.tesla.model3",
         ]
-        medium_vehicle_list = [
-            "vehicle.dodge.charger_police",
-            "vehicle.dodge.charger_police_2020",
-            "vehicle.chevrolet.impala",
-            "vehicle.citroen.c3",
-            "vehicle.toyota.prius",
-            "vehicle.mini.cooper_s_2021",
-            "vehicle.mercedes.coupe",
-            "vehicle.lincoln.mkz_2020",
-            "vehicle.seat.leon",
-            "vehicle.nissan.micra",
-            "vehicle.ford.crown",
-            "vehicle.dodge.charger_2020",
-            "vehicle.mercedes.coupe_2020",
-            "vehicle.audi.a2",
-        ]
-        if large_vehicles == False:
+        if not large_vehicles:
             while blueprint.id in large_vehicle_list:
                 blueprint = random.choice(blueprints)
         if blueprint.has_attribute("color"):
@@ -92,9 +78,7 @@ def spawn_cars(
 
             blueprint.set_attribute("color", color)
         if blueprint.has_attribute("driver_id"):
-            driver_id = random.choice(
-                blueprint.get_attribute("driver_id").recommended_values
-            )
+            driver_id = random.choice(blueprint.get_attribute("driver_id").recommended_values)
             blueprint.set_attribute("driver_id", driver_id)
         blueprint.set_attribute("role_name", "autopilot")
         try:
@@ -102,7 +86,7 @@ def spawn_cars(
             vehicles_list.append(vehicle)
         except RuntimeError as e:
             logger.info(e)
-            #continue
+            # continue
 
         spawn_point_index += 1
 
@@ -110,22 +94,22 @@ def spawn_cars(
 
 
 def spawn_pedestrians(client, world, number_of_walkers, blueprints_walkers, logger):
-    '''
+    """
     Spawn pedestrians in the Carla simulation world.
-    
+
     Parameters:
-        client (carla.Client): The Carla client object. 
+        client (carla.Client): The Carla client object.
         world (carla.World): The Carla simulation world.
         number_of_walkers (int): The number of pedestrians to spawn.
         blueprints_walkers (list): The list of pedestrian blueprints to choose from.
         logger (logging.Logger): The logger object to log messages.
-        
+
     Returns:
         walkers_list (list): The list of spawned pedestrians.
         all_id (list): The list of all spawned actors.
-    
-    '''
-    
+
+    """
+
     if number_of_walkers <= 0:
         return [], []
 
@@ -146,7 +130,7 @@ def spawn_pedestrians(client, world, number_of_walkers, blueprints_walkers, logg
         if walker_bp.has_attribute("speed"):
             walker_speed.append(walker_bp.get_attribute("speed").recommended_values[1])
         else:
-            print("Walker has no speed")
+            logger.warning("Walker has no speed")
             walker_speed.append(0.0)
         batch.append(carla.command.SpawnActor(walker_bp, spawn_point))
 
@@ -164,11 +148,7 @@ def spawn_pedestrians(client, world, number_of_walkers, blueprints_walkers, logg
     walker_controller_bp = world.get_blueprint_library().find("controller.ai.walker")
     batch = []
     for i in range(len(walkers_list)):
-        batch.append(
-            carla.command.SpawnActor(
-                walker_controller_bp, carla.Transform(), walkers_list[i]["id"]
-            )
-        )
+        batch.append(carla.command.SpawnActor(walker_controller_bp, carla.Transform(), walkers_list[i]["id"]))
 
     results = client.apply_batch_sync(batch, True)
     for i in range(len(results)):

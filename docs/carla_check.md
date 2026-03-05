@@ -45,11 +45,11 @@ vulkaninfo --summary
 
 Check if Carla is working correctly. Make the carla binary executable and run it. CarlaUE4 should now be running. You can verify this by checking watch -n 0.01 nvidia-smi, the gpu should be taxed now.
 ```
-chmod +x "/home/carla/CarlaUE4/Binaries/Linux/CarlaUE4-Linux-Shipping"
+chmod +x "/workspace/CarlaUE4/Binaries/Linux/CarlaUE4-Linux-Shipping"
 
-/home/carla/CarlaUE4/Binaries/Linux/CarlaUE4-Linux-Shipping CarlaUE4 -carla-server -RenderOffScreen
+/workspace/CarlaUE4/Binaries/Linux/CarlaUE4-Linux-Shipping CarlaUE4 -carla-server -RenderOffScreen
 ```
 
-The terminal output should looke like this:  `4.26.2-0+++UE4+Release-4.26 522 0` and via  `nvidia-smi ` one should see that a part of the gpu is blocked. Great everything seems to work!
+The terminal output should look like this:  `4.26.2-0+++UE4+Release-4.26 522 0` and via  `nvidia-smi ` one should see that a part of the gpu is blocked. Great everything seems to work!
 The container can be stopped.
 

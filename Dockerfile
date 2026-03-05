@@ -3,23 +3,27 @@
 # @author: Marius Kästingschäfer and Théo Gieruc
 # ==============================================================================
 
-FROM carlasim/carla:0.9.14
+FROM carlasim/carla:0.9.16
 
 USER root
 
-RUN rm /etc/apt/sources.list.d/cuda.list
-RUN rm /etc/apt/sources.list.d/nvidia-ml.list
-
 RUN apt-get update \
-    && apt install -y software-properties-common \
-    && apt update && apt install -y python3.8 python3.8-distutils python3-pip apt-utils git wget psmisc tmux vulkan-utils xdg-user-dirs unzip zip
+    && apt install -y apt-utils git wget psmisc tmux vulkan-utils xdg-user-dirs unzip zip
 
-RUN python3.8 -m easy_install pip
-RUN pip install --upgrade pip
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+ENV UV_PYTHON_INSTALL_DIR="/opt/python"
 
-RUN wget https://files.pythonhosted.org/packages/c1/a2/6e172f2cc17e6ad9f9853f18dd4f99c5d05d5a241ce2ba4a2daa73eff695/carla-0.9.14-cp38-cp38-manylinux_2_27_x86_64.whl 
-RUN python3.8 -m pip install carla-0.9.14-cp38-cp38-manylinux_2_27_x86_64.whl
-RUN python3.8 -m pip install jupyterlab matplotlib opencv-python scikit-image pandas tqdm pypng open3d tabulate
+# Install Python 3.12 and create venv at /opt/venv (not under /seed4d which gets volume-mounted)
+COPY pyproject.toml uv.lock /tmp/seed4d-build/
+RUN cd /tmp/seed4d-build \
+    && uv venv --python 3.12 /opt/venv \
+    && uv pip install --python /opt/venv/bin/python3 -r pyproject.toml \
+    && uv pip install --python /opt/venv/bin/python3 /workspace/PythonAPI/carla/dist/carla-0.9.16-cp312-cp312-manylinux_2_31_x86_64.whl \
+    && rm -rf /tmp/seed4d-build
+
+ENV PATH="/opt/venv/bin:$PATH"
+ENV VIRTUAL_ENV="/opt/venv"
 
 USER carla
 

@@ -6,15 +6,14 @@
 import argparse
 import json
 import os
+
 import cv2
 import numpy as np
 import open3d as o3d
 from tqdm import tqdm
 
 
-def get_single_point_cloud(
-    rgb_image_path, depth_map_path, camera_intrinsics, transform
-):
+def get_single_point_cloud(rgb_image_path, depth_map_path, camera_intrinsics, transform):
     """
     Convert RGB and depth images to point cloud
 
@@ -60,13 +59,11 @@ def get_single_point_cloud(
         camera_intrinsics["cy"],
     )
 
-    return o3d.geometry.PointCloud.create_from_rgbd_image(
-        rgbd_image, intrinsic, transform
-    )
+    return o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, intrinsic, transform)
 
 
 def get_pointcloud_from_transform(root, file):
-    with open(os.path.join(root, file), "r") as f:
+    with open(os.path.join(root, file)) as f:
         transform_info = json.load(f)
 
     fx = transform_info["fl_x"]
@@ -78,7 +75,7 @@ def get_pointcloud_from_transform(root, file):
 
     point_clouds = []
     for frame in transform_info["frames"]:
-        if ("depth_file_path" in frame.keys()) and ("file_path" in frame.keys()):
+        if ("depth_file_path" in frame) and ("file_path" in frame):
             point_cloud = get_single_point_cloud(
                 os.path.join(root, frame["file_path"]),
                 os.path.join(root, frame["depth_file_path"]),
@@ -98,9 +95,8 @@ def get_pointcloud_from_transform(root, file):
 
 def main(args):
     if args.pointcloud:
-
         # walk through the directory and get all transforms.json files
-        for root, dirs, files in tqdm(os.walk(args.data_dir)):
+        for root, _dirs, files in tqdm(os.walk(args.data_dir)):
             if "transforms.json" in files:
                 pcd = get_pointcloud_from_transform(root, "transforms.json")
                 if pcd:
@@ -111,9 +107,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", type=str, default="data")
-    parser.add_argument(
-        "--pointcloud", action="store_true", help="Generate point clouds"
-    )
+    parser.add_argument("--pointcloud", action="store_true", help="Generate point clouds")
     args = parser.parse_args()
 
     main(args)
