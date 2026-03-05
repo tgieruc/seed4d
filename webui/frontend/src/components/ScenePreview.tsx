@@ -72,11 +72,11 @@ function CameraFrustum({ position, pitch, yaw, fov, color }: CameraFrustumProps)
 
   // Camera config angles are in radians.
   // CARLA applies: yaw_deg = -(yaw_rad * 180/π + 90), pitch_deg = -pitch_rad * 180/π
-  // CARLA coords: x=forward, y=right, z=up → Three.js: carla_y→x, carla_z→y, carla_x→-z
-  // Three.js frustum looks down -Z. CARLA yaw=0° = Three.js -Z = no rotation.
-  // Mapping: three_yaw = -(yaw_rad + π/2), three_pitch = pitch_rad
+  // CARLA coords: x=forward, y=right, z=up → Three.js: carla_y→x, carla_z→y, -carla_x→z
+  // Full derivation: carla_yaw_rad = -(yaw + π/2), then map look direction to Three.js,
+  // then extract yaw = atan2(-lookX, -lookZ) = atan2(cos(yaw), -sin(yaw))
   const rotation = useMemo(() => {
-    const threeYaw = -(yaw + Math.PI / 2)
+    const threeYaw = Math.atan2(Math.cos(yaw), -Math.sin(yaw))
     return new THREE.Euler(pitch, threeYaw, 0, 'YXZ')
   }, [pitch, yaw])
 
