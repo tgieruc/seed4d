@@ -51,9 +51,9 @@ def _to_response(job: JobRecord) -> JobResponse:
         status=job.status,
         progress=job.progress,
         log=job.log,
-        created_at=job.created_at.isoformat(),
-        started_at=job.started_at.isoformat() if job.started_at else None,
-        completed_at=job.completed_at.isoformat() if job.completed_at else None,
+        created_at=job.created_at.isoformat() + "Z",
+        started_at=(job.started_at.isoformat() + "Z") if job.started_at else None,
+        completed_at=(job.completed_at.isoformat() + "Z") if job.completed_at else None,
         error=job.error,
         data_path=job.data_path,
     )

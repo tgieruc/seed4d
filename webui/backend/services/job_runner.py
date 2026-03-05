@@ -143,20 +143,23 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         db.commit()
 
         # Tail the log file, streaming lines to WebSocket subscribers
-        log_lines: list[str] = []
+        prev_size = 0
         while process.returncode is None:
-            # Read any new lines from the log file
+            # Read any new content from the log file
             try:
                 content = log_file.read_text()
             except OSError:
                 content = ""
-            new_lines = content.split("\n")
-            # Stream only new lines since last read
-            if len(new_lines) > len(log_lines):
-                for line in new_lines[len(log_lines) :]:
+            if len(content) > prev_size:
+                new_text = content[prev_size:]
+                prev_size = len(content)
+                # Broadcast new lines to WebSocket subscribers
+                for line in new_text.splitlines():
                     if line:
                         await _broadcast(job_id, {"type": "log", "line": line})
-                log_lines = new_lines
+                # Update DB so API polling also sees logs
+                job.log = content
+                db.commit()
             # Check if process finished; if not, sleep briefly
             if process.returncode is None:
                 await asyncio.sleep(1)
@@ -168,7 +171,7 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         try:
             final_log = log_file.read_text()
         except OSError:
-            final_log = "\n".join(log_lines)
+            final_log = job.log or ""
 
         job.log = final_log
         job.pid = None
