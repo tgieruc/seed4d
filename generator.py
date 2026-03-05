@@ -134,14 +134,18 @@ class Generator:
             total_waited += backoff
             try:
                 self.client = carla.Client(self.config["carla"]["host"], self.config["carla"]["port"])
-                self.client.set_timeout(self.config["carla"]["timeout"])
+                # Use a short timeout so get_world() fails fast if CARLA isn't ready yet,
+                # letting Python's retry loop handle it instead of blocking for 720s internally.
+                self.client.set_timeout(10.0)
                 self.world = self.client.get_world()
+                # Connected — restore full timeout for world setup and data generation.
+                self.client.set_timeout(self.config["carla"]["timeout"])
                 self._setup_world()
                 self._set_weather()
                 self.logger.info(f" Connected to the CARLA server after {total_waited:.1f}s")
                 return
             except Exception:
-                self.logger.debug(f" CARLA not ready after {total_waited:.1f}s, retrying...")
+                self.logger.info(f" CARLA not ready after {total_waited:.1f}s, retrying...")
                 backoff = min(backoff * 2, max_backoff)
 
         self.logger.error("CARLA process exited unexpectedly. Could not connect.")
