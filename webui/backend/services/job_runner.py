@@ -2,7 +2,6 @@ import asyncio
 import contextlib
 import logging
 import os
-import signal
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,12 +14,20 @@ from webui.backend.models import JobRecord
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+DOCKER_IMAGE = os.environ.get("SEED4D_IMAGE", "seed4d")
+
+# One job at a time by default. Raise to allow parallel jobs (needs unique CARLA ports).
+_job_semaphore = asyncio.Semaphore(1)
 
 # In-memory store for active WebSocket connections per job
 _job_subscribers: dict[str, list[asyncio.Queue]] = {}
 
 # Track running job IDs so we can clean up on shutdown
 _active_job_ids: set[str] = set()
+
+
+def _container_name(job_id: str) -> str:
+    return f"job-{job_id}"
 
 
 def subscribe(job_id: str) -> asyncio.Queue:
@@ -39,57 +46,35 @@ async def _broadcast(job_id: str, message: dict):
         await queue.put(message)
 
 
-def _detect_docker_container() -> str | None:
-    """Find a running Docker container suitable for SEED4D jobs.
-
-    Checks for containers from the ``seed4d`` or ``carlasim/carla`` images,
-    then falls back to a container literally named ``carla``.
-    """
-    # Check for seed4d image first (has Python deps + project code)
-    for image in ("seed4d", "carlasim/carla:0.9.16", "carlasim/carla"):
-        try:
-            result = subprocess.run(
-                ["docker", "ps", "--filter", f"ancestor={image}", "--format", "{{.Names}}"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            names = [n for n in result.stdout.strip().split("\n") if n]
-            if names:
-                return names[0]
-        except Exception:
-            pass
-    # Fallback: check for container named "carla" or "seed4d"
-    for name in ("carla", "seed4d"):
-        try:
-            result = subprocess.run(
-                ["docker", "inspect", "--format", "{{.State.Running}}", name],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.stdout.strip() == "true":
-                return name
-        except Exception:
-            pass
-    return None
-
-
 async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
-    """Run generator.py as subprocess, stream output via WebSocket.
+    """Run generator.py in a fresh Docker container, stream output via WebSocket.
 
-    If a running Docker container is detected, runs inside it via
-    ``docker exec``.  Otherwise falls back to running on the host.
+    Jobs are serialized by ``_job_semaphore`` (default: 1 at a time).
+    Each job gets its own container named ``job-{job_id}``.
+    On success the container is removed; on failure it is kept for inspection.
     """
+    async with _job_semaphore:
+        # Re-fetch status: job may have been cancelled while waiting in the queue
+        db = SessionLocal()
+        job = db.get(JobRecord, job_id)
+        db.close()
+        if not job or job.status == "cancelled":
+            return
+        await _run_job_inner(job_id, yaml_content, data_dir)
+
+
+async def _run_job_inner(job_id: str, yaml_content: str, data_dir: str):
     db = SessionLocal()
     config_path = None
+    success = False
+    container = _container_name(job_id)
+    job = None
     try:
         job = db.get(JobRecord, job_id)
         if not job:
             return
 
-        # Write YAML to a stable file based on job ID (mounted into Docker at /seed4d/config/)
-        loop = asyncio.get_running_loop()
+        # Write config to a stable path on the mounted volume
         config_path = str(PROJECT_ROOT / "config" / f"_job_{job_id}.yaml")
         Path(config_path).write_text(yaml_content)
 
@@ -99,39 +84,41 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         _active_job_ids.add(job_id)
         await _broadcast(job_id, {"type": "status", "status": "running"})
 
-        # Run Docker detection in a thread to avoid blocking the event loop
-        container = await loop.run_in_executor(None, _detect_docker_container)
-        logger.info("Job %s: container=%s", job_id, container)
-
         # Log file on the mounted volume — readable from both host and container
         log_file = PROJECT_ROOT / "config" / f"_job_{job_id}.log"
         log_file.write_text("")
 
-        if container:
-            # Run inside the Docker container.
-            # The project dir is volume-mounted at /seed4d (see docs/datasets.md).
-            container_config = "/seed4d/config/" + Path(config_path).name
-            container_data = "/seed4d/" + data_dir
-            container_log = "/seed4d/config/" + log_file.name
-            # Use bash to redirect output to a log file on the mounted volume
-            inner_cmd = (
-                f"PYTHONUNBUFFERED=1 python3 -u /seed4d/generator.py"
-                f" --config {container_config}"
-                f" --data_dir {container_data}"
-                f" --carla_executable /workspace/CarlaUE4.sh"
-                f" > {container_log} 2>&1"
-            )
-            cmd = ["docker", "exec", container, "bash", "-c", inner_cmd]
-        else:
-            logger.warning("No Docker container found — running generator.py on host")
-            cmd = [
-                "bash",
-                "-c",
-                f"PYTHONUNBUFFERED=1 python3 -u {PROJECT_ROOT / 'generator.py'}"
-                f" --config {config_path}"
-                f" --data_dir {PROJECT_ROOT / data_dir}"
-                f" > {log_file} 2>&1",
-            ]
+        container_config = f"/seed4d/config/_job_{job_id}.yaml"
+        container_data = f"/seed4d/{data_dir}"
+        container_log = f"/seed4d/config/_job_{job_id}.log"
+
+        inner_cmd = (
+            f"PYTHONUNBUFFERED=1 python3 -u /seed4d/generator.py"
+            f" --config {container_config}"
+            f" --data_dir {container_data}"
+            f" --carla_executable /workspace/CarlaUE4.sh"
+            f" > {container_log} 2>&1"
+        )
+
+        cmd = [
+            "docker",
+            "run",
+            "--name",
+            container,
+            "--gpus",
+            "all",
+            "--shm-size=20g",
+            "-v",
+            f"{PROJECT_ROOT}:/seed4d",
+            "-v",
+            "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+            "-v",
+            "/usr/share/vulkan/icd.d:/usr/share/vulkan/icd.d",
+            DOCKER_IMAGE,
+            "bash",
+            "-c",
+            inner_cmd,
+        ]
 
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -143,9 +130,9 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         db.commit()
 
         # Tail the log file, streaming lines to WebSocket subscribers
+        wait_task = asyncio.create_task(process.wait())
         prev_size = 0
-        while process.returncode is None:
-            # Read any new content from the log file
+        while not wait_task.done():
             try:
                 content = log_file.read_text()
             except OSError:
@@ -153,19 +140,12 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
             if len(content) > prev_size:
                 new_text = content[prev_size:]
                 prev_size = len(content)
-                # Broadcast new lines to WebSocket subscribers
                 for line in new_text.splitlines():
                     if line:
                         await _broadcast(job_id, {"type": "log", "line": line})
-                # Update DB so API polling also sees logs
                 job.log = content
                 db.commit()
-            # Check if process finished; if not, sleep briefly
-            if process.returncode is None:
-                await asyncio.sleep(1)
-                # Poll the process
-                with contextlib.suppress(Exception):
-                    await asyncio.wait_for(process.wait(), timeout=0.1)
+            await asyncio.sleep(2)
 
         # Final read of the log file
         try:
@@ -176,17 +156,23 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         job.log = final_log
         job.pid = None
 
-        if process.returncode == 0:
+        # Re-read status: cancel_job may have set it to "cancelled" while we were running
+        db.refresh(job)
+        if job.status == "cancelled":
+            await _broadcast(job_id, {"type": "status", "status": "cancelled"})
+        elif process.returncode == 0:
             job.status = "completed"
-            # Try to extract data_path from the config
             job.data_path = data_dir
+            job.completed_at = datetime.now(UTC)
+            db.commit()
+            success = True
+            await _broadcast(job_id, {"type": "status", "status": "completed"})
         else:
             job.status = "failed"
             job.error = f"Process exited with code {process.returncode}"
-
-        job.completed_at = datetime.now(UTC)
-        db.commit()
-        await _broadcast(job_id, {"type": "status", "status": job.status})
+            job.completed_at = datetime.now(UTC)
+            db.commit()
+            await _broadcast(job_id, {"type": "status", "status": "failed"})
 
     except Exception as e:
         logger.exception("Job %s failed", job_id)
@@ -199,7 +185,10 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         await _broadcast(job_id, {"type": "status", "status": "failed", "error": str(e)})
     finally:
         _active_job_ids.discard(job_id)
-        # Clean up config + log files only when job finished (not on server reload)
+        # Remove container on success; leave it on failure/cancel for inspection
+        if success:
+            _remove_container(container)
+        # Clean up config + log files
         if config_path and job and job.status in ("completed", "failed", "cancelled"):
             with contextlib.suppress(OSError):
                 os.unlink(config_path)
@@ -208,12 +197,23 @@ async def run_job(job_id: str, yaml_content: str, data_dir: str = "data"):
         db.close()
 
 
+def _remove_container(container: str):
+    with contextlib.suppress(Exception):
+        subprocess.run(["docker", "rm", container], capture_output=True, timeout=10)
+
+
+def _stop_container(container: str):
+    with contextlib.suppress(Exception):
+        subprocess.run(["docker", "stop", container], capture_output=True, timeout=15)
+
+
 def mark_active_jobs_failed():
-    """Mark any in-memory active jobs as failed. Called on shutdown."""
+    """Mark any in-memory active jobs as failed and stop their containers. Called on shutdown."""
     if not _active_job_ids:
         return
     db = SessionLocal()
     for jid in list(_active_job_ids):
+        _stop_container(_container_name(jid))
         job = db.get(JobRecord, jid)
         if job and job.status == "running":
             job.status = "failed"
@@ -226,7 +226,7 @@ def mark_active_jobs_failed():
 
 
 def cleanup_stale_configs():
-    """Remove leftover _job_*.yaml config files from completed/failed jobs."""
+    """Remove leftover _job_*.yaml and _job_*.log config files from completed/failed jobs."""
     config_dir = PROJECT_ROOT / "config"
     for f in config_dir.glob("_job_*"):
         with contextlib.suppress(OSError):
@@ -237,9 +237,8 @@ def cancel_job(job_id: str, db: Session):
     job = db.get(JobRecord, job_id)
     if not job:
         return False
-    if job.pid:
-        with contextlib.suppress(ProcessLookupError):
-            os.kill(job.pid, signal.SIGTERM)
+    # Stop the container — this cleanly terminates generator.py and CARLA inside it
+    _stop_container(_container_name(job_id))
     job.status = "cancelled"
     job.completed_at = datetime.now(UTC)
     job.pid = None

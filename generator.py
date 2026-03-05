@@ -114,8 +114,12 @@ class Generator:
             self.logger.error(f"CARLA executable not found at {self.carla_executable}")
             raise Exception(f"CARLA executable not found at {self.carla_executable}")
 
+        # Pass the target map at startup so CARLA boots directly into it,
+        # avoiding a slow load_world() call during _setup_world().
+        target_map = self.config.get("map", "")
+        map_arg = [f"/Game/Carla/Maps/{target_map}"] if target_map else []
         flags = ["-carla-server", "-RenderOffScreen", "-nosound", "-quality-level=Epic"]
-        command = [self.carla_executable, *flags]
+        command = [self.carla_executable, *map_arg, *flags]
         self.carla_process = subprocess.Popen(command)
 
         # Exponential backoff: try connecting starting at 2s, doubling up to 16s
@@ -164,7 +168,7 @@ class Generator:
 
         self.blueprint_library = self.world.get_blueprint_library()
 
-        if self.world.get_map().name != self.config["map"]:
+        if not self.world.get_map().name.endswith(self.config["map"]):
             self.world = self.client.load_world(self.config["map"])
 
         self.map = self.world.get_map()
